@@ -1,5 +1,13 @@
 @import url('https://fonts.googleapis.com/css?family=Lato:300,400');
 
+body {
+    background: url(img/background.png) no-repeat center center fixed; 
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    -o-background-size: cover;
+    background-size: cover;
+}
+
 p {
     font-family: 'Lato', sans-serif;
     color: blueviolet;
@@ -15,6 +23,14 @@ p {
     stroke: rgb(78,205,196);
     stroke-width: 2;
     fill: none;
+}
+
+.outdoor {
+    fill: rgb(244,208,63);
+}
+
+.indoor {
+    fill: rgb(78,205,196);
 }
 
 #cover {
@@ -40,6 +56,7 @@ p {
     height: inherit;
     background-color: rgba(0,0,0,0.75);
     margin: 0 auto;
+    margin-top: 5px;
     margin-bottom: 15px;
     border-radius: 15px
 }

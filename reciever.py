@@ -8,8 +8,10 @@ import datetime
 import threading
 import psycopg2
 
+#from datetime import datetime
 from flask import Flask, jsonify, render_template, request
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Date, cast
 
 TCP_IP = '127.0.0.1'
 TCP_PORT = 11111
@@ -73,13 +75,32 @@ def hello():
 def get_all_meter_readings():
     return jsonify(meters=[i.serialize for i in Water_usage.query.all()])
 
+@app.route("/sha/v1.0/readings/daily", methods=['GET'])
+def get_daily_readings():
+
+    # check to see if the user submitted a max number of requests
+    data = request.args
+    max = 10
+    if ('max' in data.keys()):
+        max = int(data['max'])
+
+    # get the sum of indoor and outdoor readings by date, limiting by the max number of values the client wants
+    agg = db.session.query(
+        db.func.sum(Water_usage.outdoor),
+        db.func.sum(Water_usage.indoor),
+        cast(Water_usage.ts,Date)).group_by(cast(Water_usage.ts, Date)).order_by(cast(Water_usage.ts,Date).desc()).limit(max)
+    return jsonify(meters=[{'outdoor': float(str(i[1])), 'indoor': float(str(i[0])), 'timestamp': str(i[2])} for i in agg])
+
+# this returns the most current readings, up to a max submitted by the requester
+# the default max is 10
 @app.route("/sha/v1.0/readings/current/", methods=['GET'])
 def get_current_meter_readings():
     data = request.args
     max = 10
-    if ('max' in data.values()):
+    if ('max' in data.keys()):
         max = int(data['max'])
     result = db.session.query(Water_usage).order_by(Water_usage.ts.desc()).limit(max)
+    #print result
     return jsonify(meters=[i.serialize for i in result])
 
 # this returns the readings that have occurred since the timestamp that is passed

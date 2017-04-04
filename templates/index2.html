@@ -11,11 +11,11 @@
         <div id="cover"></div>
         <div id="current" class="graphDiv">
             <br>
-            <div class="graphHeading">Current Water Usage</div>
+            <div class="graphHeading">Current Water Use</div>
         </div>
         <div id= "aggregate" class="graphDiv">
             <br>
-            <div class="graphHeading">Historical Water Usage</div>
+            <div class="graphHeading">Historical Water Use</div>
         </div>
         
         <script type="text/javascript">
@@ -23,8 +23,8 @@
             var width = 900;
             var height = 500;
             var barPadding = 7;
-            var heightPadding = 60;
-            var widthPadding = 35; 
+            var heightPadding = 40;
+            var widthPadding = 40; 
             var maxVals = Math.round(width/60);
             
             
@@ -62,9 +62,6 @@
             function drawCurrentGraph(dataset){
                 
                 function getXLoc(d,i){
-                    //var sectionWidth = (width-widthPadding)/dataset.length;
-                    //return sectionWidth*i + widthPadding + sectionWidth/2;
-                    console.log(scaleTime(new Date(d.timestamp)));
                     return scaleTime(new Date(d.timestamp));
                 }
                 
@@ -72,11 +69,7 @@
 
                 var scaleTime = d3.time.scale()
                     .domain([new Date(dataset[dataset.length-1].timestamp), new Date(dataset[0].timestamp)])
-                    .range([widthPadding, width-widthPadding]);
-                
-               // console.log(scaleTime);
-                console.log(new Date(dataset[0].timestamp));
-                console.log(new Date(dataset[dataset.length-1].timestamp));
+                    .range([widthPadding, width-widthPadding/2]);
                 
                 var scaleHeight = d3.scale.linear()
                     .domain([0, d3.max(dataset, function(d) {return Math.max(d.outdoor, d.indoor);})])
@@ -91,76 +84,7 @@
                     .attr("width", width)
                     .attr("height", height);
                 
-                svgCurrent.selectAll("line.horizontalGrid")
-                    .data(scaleHeightUpsideDown.ticks(5))
-                    .enter()
-                    .append("line")
-                        .attr(
-                        {
-                            "class":"horizontalGrid",
-                            "x1" : widthPadding,
-                            "x2" : width - widthPadding,
-                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
-                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
-                            "fill" : "none",
-                            "shape-rendering" : "crispEdges",
-                            "stroke" : "white",
-                            "stroke-width" : "1px",
-                            "stroke-dasharray" : "5, 5"
-                        });
-                
-                svgCurrent.selectAll("#outdoorCircle")
-                    .data(dataset)
-                    .enter()
-                    .append("circle")
-                    .attr("cx", function(d,i){
-                        return getXLoc(d,i);
-                    })
-                    .attr("cy", function(d){
-                        return height - scaleHeight(d.outdoor) - heightPadding;
-                    })
-                    .attr("r", 10)
-                    .attr("id", "outdoorCircle")
-                    .attr("fill", "rgb(244,208,63)");
-                
-                svgCurrent.selectAll("#indoorCircle")
-                    .data(dataset)
-                    .enter()
-                    .append("circle")
-                    .attr("cx", function(d,i){
-                       // return ((width-widthPadding)/dataset.length)*i + widthPadding*2;
-                        return getXLoc(d,i);
-                    })
-                    .attr("cy", function(d){
-                        return height - scaleHeight(d.indoor) - heightPadding;
-                    })
-                    .attr("r", 10)
-                    .attr("id", "indoorCircle")
-                    .attr("fill", "rgb(78,205,196)");
-                
-                var valueInd = d3.svg.line()
-                    .x(function(d, i) { 
-                        //return ((width-widthPadding)/dataset.length)*i + widthPadding*2
-                        return getXLoc(d,i);
-                    })
-                    .y(function(d){return height - scaleHeight(d.indoor) - heightPadding;});
-                
-                var valueOut = d3.svg.line()
-                    .x(function(d, i) { 
-                        //return ((width-widthPadding)/dataset.length)*i + widthPadding*2
-                        return getXLoc(d,i);
-                    })
-                    .y(function(d){return height - scaleHeight(d.outdoor) - heightPadding;});
-                
-                svgCurrent.append("path")
-                    .attr("class", "indoorPath")
-                    .attr("d", valueInd(dataset));
-                
-                svgCurrent.append("path")
-                    .attr("class", "outdoorPath")
-                    .attr("d", valueOut(dataset));
-                
-                var yAxis = d3.svg.axis()
+                 var yAxis = d3.svg.axis()
                     .scale(scaleHeightUpsideDown)
                     .orient("left")
                     .ticks(5);
@@ -180,6 +104,74 @@
                     .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
                     .call(yAxis);
                 
+                // add the gridlines
+                svgCurrent.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5))
+                    .enter()
+                    .append("line")
+                        .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "white",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
+                
+                // add the outdoor data points
+                svgCurrent.selectAll("#outdoorCircle")
+                    .data(dataset)
+                    .enter()
+                    .append("circle")
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ return height - scaleHeight(d.outdoor) - heightPadding;},
+                        "r": 8,
+                        "id": "outdoorCircle",
+                        "class": "outdoor"
+                    });
+                
+                // add the indoor data points
+                svgCurrent.selectAll("#indoorCircle")
+                    .data(dataset)
+                    .enter()
+                    .append("circle")
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ return height - scaleHeight(d.indoor) - heightPadding;},
+                        "r": 8,
+                        "id": "indoorCircle",
+                        "class": "indoor"
+                    });
+                
+                // function for adding the connection between points
+                var valueInd = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.indoor) - heightPadding;});
+                
+                var valueOut = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.outdoor) - heightPadding;});
+                
+                // append the paths between points
+                svgCurrent.append("path")
+                    .attr("class", "indoorPath")
+                    .attr("d", valueInd(dataset));
+                
+                svgCurrent.append("path")
+                    .attr("class", "outdoorPath")
+                    .attr("d", valueOut(dataset));
+                
+               
                 addYLabel(svgCurrent);
                 
     
@@ -187,8 +179,6 @@
             
             function drawAggGraph(dataset, callback) {
                 
-                //console.log("I'm going to draw the graph");
-
                 var scaleHeight = d3.scale.linear()
                     .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
                     .range([0, height-heightPadding*2]);
@@ -206,56 +196,40 @@
                     .data(dataset)
                     .enter()
                     .append("rect")
-                    .attr("fill", "white")
-                    .attr("x", function(d,i){
-                        return ((width-widthPadding)/dataset.length)*i + widthPadding;
-                    })
-                    .attr("y", function (d){
-                        return height - scaleHeight(d.outdoor) - scaleHeight(d.indoor) - heightPadding;   
-                    })
-                    .attr("width", (width-widthPadding)/dataset.length - barPadding)
-                    .transition()
-                    .duration(1000)
-                    .attr("height", function(d){
-                        return scaleHeight(d.outdoor);
-                    })
-                //    .attr("rx", 5)
-                  //  .attr("ry", 3)
-                    .attr("id", "outdoorRect")
-                   // .attr("box-shadow", "3px 3px 1px black")
-                    .attr("fill", function(d) {
-                        // hmmmm let's think of something to do here to make our dreams happen
-                        //return "rgb(" + (d.outdoor)*3 + "," + (255-(d.outdoor)) + ", 0)";
-                        return "rgb(244,208,63)"
+                    .attr({
+                        "x": function(d,i){
+                            return ((width-widthPadding)/dataset.length)*i + widthPadding;
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.outdoor) - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.outdoor);
+                        },
+                        "id": "outdoorRect",
+                        "class": "outdoor"
                     });
                 
                 svgAgg.selectAll("#indoorRect")
                     .data(dataset)
                     .enter()
                     .append("rect")
-                    .attr("fill", "white")
-                    .attr("x", function(d,i){
-                        return ((width-widthPadding)/dataset.length)*i + widthPadding;
-                    })
-                    .attr("y", function (d){
-                        return height - scaleHeight(d.indoor) - heightPadding;   
-                    })
-                    .attr("width", (width-widthPadding)/dataset.length - barPadding)
-                    .transition()
-                    .duration(1000)
-                    .attr("height", function(d){
-                        return scaleHeight(d.indoor);
-                    })
-               //     .attr("rx", 5)
-                //    .attr("ry", 3)
-                    .attr("id", "indoorRect")
-                   // .attr("box-shadow", "3px 3px 1px black")
-                    .attr("fill", function(d) {
-                        // hmmmm let's think of something to do here to make our dreams happen
-                        //return "rgb(" + (d.indoor)*3 + "," + (255-(d.indoor)) + ", 0)";
-                        return "rgb(78,205,196)";
+                    .attr({
+                        "x": function(d,i){
+                            return ((width-widthPadding)/dataset.length)*i + widthPadding;
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.indoor);
+                        },
+                        "id": "indoorRect",
+                        "class": "indoor"
                     });
-
+                
                 svgAgg.selectAll("#outdoorText")
                     .data(dataset)
                     .enter()
