@@ -89,7 +89,7 @@ def get_daily_readings():
         db.func.sum(Water_usage.outdoor),
         db.func.sum(Water_usage.indoor),
         cast(Water_usage.ts,Date)).group_by(cast(Water_usage.ts, Date)).order_by(cast(Water_usage.ts,Date).desc()).limit(max)
-    return jsonify(meters=[{'outdoor': float(str(i[1])), 'indoor': float(str(i[0])), 'timestamp': str(i[2])} for i in agg])
+    return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(i[2])} for i in agg])
 
 # this returns the most current readings, up to a max submitted by the requester
 # the default max is 10

@@ -14,23 +14,23 @@ p {
 }
 
 .outdoorPath { 
-    stroke: rgb(244,208,63);
+    stroke: rgb(78,205,196); 
     stroke-width: 2;
     fill: none;
 }
 
 .indoorPath  {
-    stroke: rgb(78,205,196);
+    stroke: rgb(244,208,63);
     stroke-width: 2;
     fill: none;
 }
 
 .outdoor {
-    fill: rgb(244,208,63);
+    fill: rgb(78,205,196);
 }
 
 .indoor {
-    fill: rgb(78,205,196);
+    fill: rgb(244,208,63);
 }
 
 #cover {

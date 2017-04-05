@@ -22,7 +22,7 @@
             
             var width = 900;
             var height = 500;
-            var barPadding = 7;
+            var barPadding = 15;
             var heightPadding = 40;
             var widthPadding = 40; 
             var maxVals = Math.round(width/60);
@@ -32,11 +32,12 @@
                 var requestCurrent = $.ajax({
                     url: '/sha/v1.0/readings/current/',
                     data: {"max": maxVals},
-                    method: 'GET',
+                    method: 'GET'
                 });
                 
                 var requestAgg = $.ajax({
-                    url: '/sha/v1.0/readings',
+                    url: '/sha/v1.0/readings/daily',
+                    data: {"max": maxVals},
                     method: 'GET'
                 });
                 
@@ -130,7 +131,9 @@
                     .append("circle")
                     .attr({
                         "cx": function(d,i){return getXLoc(d,i);},
-                        "cy": function(d){ return height - scaleHeight(d.outdoor) - heightPadding;},
+                        "cy": function(d){ 
+                            return height - scaleHeight(d.outdoor) - heightPadding;
+                        },
                         "r": 8,
                         "id": "outdoorCircle",
                         "class": "outdoor"
@@ -179,6 +182,17 @@
             
             function drawAggGraph(dataset, callback) {
                 
+                var lastDate = getAdjustedDate(dataset[0].timestamp); 
+                console.log(lastDate);
+                var firstDate = getAdjustedDate(dataset[dataset.length-1].timestamp);
+                
+                // note, this only works for daily readings, what we're doing rn
+                lastDate.setDate(lastDate.getDate() + 1);
+                
+                var scaleTime = d3.time.scale()
+                    .domain([firstDate, lastDate])
+                    .range([widthPadding, width-widthPadding/2]);
+                
                 var scaleHeight = d3.scale.linear()
                     .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
                     .range([0, height-heightPadding*2]);
@@ -186,11 +200,29 @@
                 var scaleHeightUpsideDown = d3.scale.linear()
                     .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
                     .range([height-heightPadding*2, 0]);
-
+                
                 var svgAgg = d3.select("#aggregate")
                     .append("svg")
                     .attr("width", width)
                     .attr("height", height);
+                
+                svgAgg.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5))
+                    .enter()
+                    .append("line")
+                        .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "white",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
                 
                 svgAgg.selectAll("#outdoorRect")
                     .data(dataset)
@@ -198,12 +230,13 @@
                     .append("rect")
                     .attr({
                         "x": function(d,i){
-                            return ((width-widthPadding)/dataset.length)*i + widthPadding;
+                            var date = getAdjustedDate(d.timestamp);
+                            return scaleTime(date);
                         },
                         "y": function (d){
                             return height - scaleHeight(d.outdoor) - scaleHeight(d.indoor) - heightPadding;   
                         },
-                        "width": (width-widthPadding)/dataset.length - barPadding,
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
                         "height": function(d){
                             return scaleHeight(d.outdoor);
                         },
@@ -217,12 +250,13 @@
                     .append("rect")
                     .attr({
                         "x": function(d,i){
-                            return ((width-widthPadding)/dataset.length)*i + widthPadding;
+                            date = getAdjustedDate(d.timestamp);
+                            return scaleTime(date);
                         },
                         "y": function (d){
                             return height - scaleHeight(d.indoor) - heightPadding;   
                         },
-                        "width": (width-widthPadding)/dataset.length - barPadding,
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
                         "height": function(d){
                             return scaleHeight(d.indoor);
                         },
@@ -230,52 +264,53 @@
                         "class": "indoor"
                     });
                 
-                svgAgg.selectAll("#outdoorText")
+                svgAgg.selectAll(".barText")
                     .data(dataset)
                     .enter()
                     .append("text")
                     .text(function(d){
-                        return d.outdoor == 0 ? "" : d.outdoor;
+                        return (d.indoor + d.outdoor).toFixed(2);
                     })
-                    .attr("x", function(d, i){
-                        return i * ((width-widthPadding)/dataset.length) + ((width-widthPadding)/dataset.length - barPadding)/2 + widthPadding;
+                    .attr("x", function(d){
+                        var date = getAdjustedDate(d.timestamp);
+                        return scaleTime(date) + ((width-widthPadding/2)/dataset.length - barPadding)/2;
                     })
                     .attr("y", function(d){
-                        return height - scaleHeight(d.outdoor) - scaleHeight(d.indoor) + ((width-widthPadding)/dataset.length - barPadding)/2 - heightPadding;
+                        return height - scaleHeight(d.indoor) - scaleHeight(d.outdoor) - heightPadding*4/3;
                     })
                     .attr("class", "barText")
-                    .attr("id","outdoorText");
+                    .attr("text-anchor", "middle");
                 
-                svgAgg.selectAll("#indoorText")
-                    .data(dataset)
-                    .enter()
-                    .append("text")
-                    .text(function(d){
-                        return d.indoor == 0 ? "" : d.indoor;
-                    })
-                    .attr("x", function(d, i){
-                        return i * ((width-widthPadding)/dataset.length) + ((width-widthPadding)/dataset.length - barPadding)/2 + widthPadding;
-                    })
-                    .attr("y", function(d){
-                        return height - scaleHeight(d.indoor) + ((width-widthPadding)/dataset.length - barPadding)/2 - heightPadding;
-                    })
-                    .attr("class", "barText")
-                    .attr("id","indoorText");
-            
                 var yAxis = d3.svg.axis()
                     .scale(scaleHeightUpsideDown)
                     .orient("left")
                     .ticks(5);
+                
+                var xAxis = d3.svg.axis()
+                    .scale(scaleTime)
+                    .orient("bottom")
+                    .ticks(dataset.length + 1);
                 
                 svgAgg.append("g")
                     .attr("class", "axis")
                     .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
                     .call(yAxis);
                 
+                svgAgg.append("g")
+                    .attr("class", "axis")
+                    .call(xAxis)
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
+                
                 addYLabel(svgAgg);
                 
                 callback();
             
+                function getAdjustedDate(timestamp){
+                    var date = new Date(timestamp);
+                    date.setHours(24,0,0,0);
+                    return date;
+                }
+                
             }
             
             function addYLabel(svg){
@@ -288,6 +323,8 @@
                     .attr("transform", "rotate(-90)")
                     .text("Gallons");
             }
+            
+            
             
         </script>
     </body>
