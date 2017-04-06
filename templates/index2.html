@@ -17,6 +17,9 @@
             <br>
             <div class="graphHeading">Historical Water Use</div>
         </div>
+        <div id="aggButton" class="graphButtonDiv">
+            <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
+        </div>
         
         <script type="text/javascript">
             
@@ -29,6 +32,9 @@
             
             
             $(document).ready(function() {
+                
+                init();
+                
                 var requestCurrent = $.ajax({
                     url: '/sha/v1.0/readings/current/',
                     data: {"max": maxVals},
@@ -42,12 +48,6 @@
                 });
                 
                 requestCurrent.done(function (msg) {
-                    $(".graphHeading").css("width", width);
-                    $(".graphDiv").css("width", width+widthPadding/3);
-                    //console.log(msg.meters);
-                   // drawAggGraph(msg.meters, function () {
-                    //    $("#cover").fadeOut(700);
-                    //});
                     drawCurrentGraph(msg.meters);
                 });
                 
@@ -55,10 +55,27 @@
                     drawAggGraph(msg.meters, function () {
                         $("#cover").fadeOut(700);
                     });
-                })
+                });
                 
+                // listener for changing the aggregated dataset between
+                // daily, hourly, and monthly aggregation
+                $('button').on('click', function(){
+                    $('button').removeClass('selected');
+                    $(this).addClass('selected');
+                });
                 
             });
+            
+            function init() {
+                // by default, historical graph is aggregated only a daily basis
+                $("#dailyButton").addClass('selected');
+                
+                $(".graphHeading").css("width", width);
+                $(".graphButtonDiv").css("width", width+widthPadding/3);
+                $(".graphButtonDiv").css("height", heightPadding);
+                $(".graphDiv").css("width", width+widthPadding/3);
+                
+            }
             
             function drawCurrentGraph(dataset){
                 
