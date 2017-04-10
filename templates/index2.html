@@ -28,8 +28,7 @@
             var barPadding = 15;
             var heightPadding = 40;
             var widthPadding = 40; 
-            var maxVals = Math.round(width/60);
-            
+            var maxVals = Math.round(width/60);            
             
             $(document).ready(function() {
                 
@@ -60,8 +59,27 @@
                 // listener for changing the aggregated dataset between
                 // daily, hourly, and monthly aggregation
                 $('button').on('click', function(){
+                    
                     $('button').removeClass('selected');
                     $(this).addClass('selected');
+    
+                    var type = this.id.replace('Button', '');
+
+                    // get the aggregated dataset of the specific range
+                    var requestAgg = $.ajax({
+                            url: '/sha/v1.0/readings/' + type,
+                            data: {"max": maxVals},
+                            method: 'GET'
+                    });
+                    
+                    // when this request is received, update the UI to reflect the
+                    // appropriate range
+                    requestAgg.done(function (msg){
+                        console.log(msg.meters);
+                        console.log(type);
+                        updateAggGraph(msg.meters, type);
+                    })
+                    
                 });
                 
             });
@@ -113,12 +131,12 @@
                     .ticks(dataset.length);
                 
                 svgCurrent.append("g")
-                    .attr("class", "axis")
+                    .attr("class", "x axis")
                     .call(xAxis)
                     .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
                 
                 svgCurrent.append("g")
-                    .attr("class", "axis")
+                    .attr("class", "y axis")
                     .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
                     .call(yAxis);
                 
@@ -309,14 +327,15 @@
                     .ticks(dataset.length + 1);
                 
                 svgAgg.append("g")
-                    .attr("class", "axis")
+                    .attr("class", "y axis")
                     .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
                     .call(yAxis);
                 
                 svgAgg.append("g")
-                    .attr("class", "axis")
-                    .call(xAxis)
-                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
+                    .attr("class", "x axis")
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")")
+                    .call(xAxis);
+                    
                 
                 addYLabel(svgAgg);
                 
@@ -325,6 +344,89 @@
                 function getAdjustedDate(timestamp){
                     var date = new Date(timestamp);
                     date.setHours(24,0,0,0);
+                    return date;
+                }
+                
+            }
+            
+            function updateAggGraph(dataset,type){
+                var lastDate = getAdjustedDate(dataset[0].timestamp, type, true); 
+                console.log(lastDate);
+                var firstDate = getAdjustedDate(dataset[dataset.length-1].timestamp, type, false);
+                console.log(firstDate);
+                
+                
+                var scaleTime = d3.time.scale()
+                    .domain([firstDate, lastDate])
+                    .range([widthPadding, width-widthPadding/2]);
+                
+                var scaleHeight = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
+                    .range([0, height-heightPadding*2]);
+
+                var scaleHeightUpsideDown = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
+                    .range([height-heightPadding*2, 0]);
+                
+                var yAxis = d3.svg.axis()
+                    .scale(scaleHeightUpsideDown)
+                    .orient("left")
+                    .ticks(5);
+                
+                var xAxis = d3.svg.axis()
+                    .scale(scaleTime)
+                    .orient("bottom")
+                    .ticks(dataset.length + 1);
+                
+                var svgAgg = d3.select("#aggregate svg").transition();
+                
+                //console.log(svgAgg);
+                
+                /*
+                svgAgg.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5))
+                    .enter()
+                    .transition(5000)
+                    .remove();
+                
+                svgAgg.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5))
+                    .enter()
+                //    .transition(5000)
+                    .append("line")
+                        .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "white",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
+                */
+                svgAgg.selectAll(".x.axis")                    // change the x axis
+                   .duration(750)
+                    .call(xAxis);
+                svgAgg.selectAll(".y.axis") // change the y axis
+                    .duration(750)
+                    .call(yAxis);
+                
+                function getAdjustedDate(timestamp, type, last){
+                    var date = new Date(timestamp);
+                    
+                    if (type == 'daily') {
+                        date.setHours(24,0,0,0);
+                        if (last) date.setDate(date.getDate() + 1);
+                    }
+                    
+                    if (type == 'hourly'){
+                        if (last) date.setHours(date.getHours() + 1);
+                    }
+                    
                     return date;
                 }
                 
