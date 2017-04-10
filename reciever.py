@@ -75,6 +75,24 @@ def hello():
 def get_all_meter_readings():
     return jsonify(meters=[i.serialize for i in Water_usage.query.all()])
 
+@app.route("/sha/v1.0/readings/hourly", methods=['GET'])
+def get_hourly_readings():
+    # check to see if the user submitted a max number of requests
+    data = request.args
+    max = 10
+    if ('max' in data.keys()):
+        max = int(data['max'])
+    
+    # query for the date and the specific hour, ordering by descending date, then
+    # descending hour and limiting the returned values to the max specified by client
+    agg = db.session.query(
+        db.func.sum(Water_usage.outdoor),
+        db.func.sum(Water_usage.indoor),
+        db.func.date_part('hour', Water_usage.ts),
+        cast(Water_usage.ts,Date)).group_by(db.func.date_part('hour',Water_usage.ts), cast(Water_usage.ts,Date)).order_by(cast(Water_usage.ts,Date).desc(), db.func.date_part('hour',Water_usage.ts).desc()).limit(max)
+
+    return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(datetime.datetime.combine(i[3], datetime.time(int(i[2]))))} for i in agg])
+
 @app.route("/sha/v1.0/readings/daily", methods=['GET'])
 def get_daily_readings():
 
