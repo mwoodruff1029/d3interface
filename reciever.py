@@ -93,6 +93,24 @@ def get_hourly_readings():
 
     return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(datetime.datetime.combine(i[3], datetime.time(int(i[2]))))} for i in agg])
 
+@app.route("/sha/v1.0/readings/monthly", methods=['GET'])
+def get_monthly_readings():
+    # check to see if the user submitted a max number of requests
+    data = request.args
+    max = 10
+    if ('max' in data.keys()):
+        max = int(data['max'])
+    
+    # query for the year and month, ordering by descending year then month
+    # limit results to max value
+    agg = db.session.query(
+        db.func.sum(Water_usage.outdoor),
+        db.func.sum(Water_usage.indoor),
+        db.func.date_part('month', Water_usage.ts),
+        db.func.date_part('year', Water_usage.ts)).group_by(db.func.date_part('month',Water_usage.ts), db.func.date_part('year',Water_usage.ts)).order_by(db.func.date_part('year',Water_usage.ts).desc(), db.func.date_part('month',Water_usage.ts).desc()).limit(max)
+
+    return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(datetime.date(int(i[3]), int(i[2]), 1))} for i in agg])
+
 @app.route("/sha/v1.0/readings/daily", methods=['GET'])
 def get_daily_readings():
 
