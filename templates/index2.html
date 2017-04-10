@@ -378,23 +378,37 @@
                     .orient("bottom")
                     .ticks(dataset.length + 1);
                 
-                var svgAgg = d3.select("#aggregate svg").transition();
+                var svgAgg = d3.select("#aggregate svg");
                 
-                //console.log(svgAgg);
+            
+                // associate the bars, indoor rectangles and outdoor rectangles with the
+                // new dataset
+                var indoorRects = svgAgg.selectAll("#indoorRect")
+                    .data(dataset);
+                var outdoorRects = svgAgg.selectAll("#outdoorRect")
+                    .data(dataset);
+                var barText = svgAgg.selectAll(".barText")
+                    .data(dataset);
+                var graphLines = svgAgg.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5));
                 
-                /*
-                svgAgg.selectAll("line.horizontalGrid")
-                    .data(scaleHeightUpsideDown.ticks(5))
-                    .enter()
-                    .transition(5000)
-                    .remove();
+                // remove unnecessary objects and add now needed ones
+                indoorRects.exit().remove();
+                indoorRects.enter().append("rect").attr({"width": 0, "height":0});
+
+                outdoorRects.exit().remove();
+                outdoorRects.enter().append("rect").attr({"width": 0, "height":0});
                 
-                svgAgg.selectAll("line.horizontalGrid")
-                    .data(scaleHeightUpsideDown.ticks(5))
-                    .enter()
-                //    .transition(5000)
-                    .append("line")
-                        .attr(
+                barText.exit().remove();
+                barText.enter().append("text").text("0");
+                
+                graphLines.exit().remove();
+                graphLines.enter().append("line").moveToBack();
+                
+                // transition text/bars to their new values
+                graphLines.transition()
+                    .duration(750)
+                    .attr(
                         {
                             "class":"horizontalGrid",
                             "x1" : widthPadding,
@@ -407,14 +421,69 @@
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
-                */
+                
+                barText.transition()
+                    .duration(750)
+                    .text(function(d){
+                        return (d.indoor + d.outdoor).toFixed(2);
+                    })
+                    .attr("x", function(d){
+                        var date = getAdjustedDate(d.timestamp, type);
+                        return scaleTime(date) + ((width-widthPadding/2)/dataset.length - barPadding)/2;
+                    })
+                    .attr("y", function(d){
+                        return height - scaleHeight(d.indoor) - scaleHeight(d.outdoor) - heightPadding*4/3;
+                    })
+                    .attr("class", "barText")
+                    .attr("text-anchor", "middle");
+                
+                // update existing ones
+                indoorRects.transition()
+                    .duration(750)
+                    .attr({
+                        "x": function(d,i){
+                            date = getAdjustedDate(d.timestamp, type);
+                            return scaleTime(date);
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.indoor);
+                        },
+                        "id": "indoorRect",
+                        "class": "indoor"
+                    });
+                
+                outdoorRects.transition()
+                    .duration(750)
+                    .attr({
+                        "x": function(d,i){
+                            var date = getAdjustedDate(d.timestamp, type);
+                            return scaleTime(date);
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.outdoor) - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.outdoor);
+                        },
+                        "id": "outdoorRect",
+                        "class": "outdoor"
+                    });
+                
                 svgAgg.selectAll(".x.axis")                    // change the x axis
-                   .duration(750)
+                   .transition()
+                    .duration(750)
                     .call(xAxis);
                 svgAgg.selectAll(".y.axis") // change the y axis
+                    .transition()
                     .duration(750)
                     .call(yAxis);
                 
+            
                 function getAdjustedDate(timestamp, type, last){
                     var date = new Date(timestamp);
                     
@@ -443,7 +512,16 @@
                     .text("Gallons");
             }
             
-            
+            // This method at the suggestion of user Sundar on bl.ocks.org
+            // link: http://bl.ocks.org/eesur/4e0a69d57d3bfc8a82c2
+            d3.selection.prototype.moveToBack = function() {  
+                return this.each(function() { 
+                    var firstChild = this.parentNode.firstChild; 
+                    if (firstChild) { 
+                        this.parentNode.insertBefore(this, firstChild); 
+                    } 
+                });
+            };
             
         </script>
     </body>
