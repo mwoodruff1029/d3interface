@@ -16,11 +16,20 @@ p {
 #left {
     float: left;
     margin-left: 15px;
+    /* Standard */
+    width: calc(30% - 45px);
+        /* Firefox */
+    width: -moz-calc(35% - 45px);
+    /* WebKit */
+    width: -webkit-calc(35% - 45px);
+    /* Opera */
+    width: -o-calc(35% - 45px);
 }
 
 #right {
     float: right;
     margin-right: 15px;
+    width: 65%;
 }
 
 .outdoorPath { 
@@ -55,18 +64,38 @@ p {
 
 .graphHeading {
     font-family: 'Lato', sans-serif;
-    font-size: 26px;
+    font-size: 2vw;
     text-align: center;
     color: white;
     font-weight: 400;
     width: inherit;
+    padding-top: 20px;
+}
+
+#clock {
+    font-family: 'Lato', sans-serif;
+    text-align: center;
+    font-size: 5.5vw;
+    color: white;
+    font-weight:400;
+    width: inherit;
+    padding-top: 1.3vw;
+}
+
+#dateString {
+    font-family: 'Lato', sans-serif;
+    text-align: center;
+    font-size: 2.5vw;
+    color: white;
+    font-weight:300;
+    width: inherit;
 }
 
 .graphDiv {
-    width: inherit;
+    width: 100%;
     height: inherit;
     background-color: rgba(0,0,0,0.75);
-    margin: 0 auto;
+    margin: 0;
     margin-top: 15px;
 }
 
@@ -122,6 +151,7 @@ svg .barText {
     height: 100%;
     transition-duration: 0.4s;
     -webkit-transition-duration: 0.4s; /* Safari */
+    margin-bottom: 15px;
 }
 
 .button:hover {
@@ -140,7 +170,7 @@ svg .barText {
 }
 
 .graphButtonDiv {
-    width: inherit;
+    width: 100%;
     height: inherit;
     background-color: rgba(40,40,40,0.8);
     margin: 0 auto;

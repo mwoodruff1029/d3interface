@@ -7,22 +7,20 @@
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
         <link rel="stylesheet" href="{{ url_for('static', filename='stylesheets/style.css') }}">
     </head>
-    <body>
+    <body onresize="resizeEvent()" onload="startTime()">
         <div id="cover"></div>
         <div id="content">
             <div id="left">
-                <div id="pieChart" class="graphDiv">
-                    <br>
-                    <div class="graphHeading">Good Evening</div>
+                <div id="datetime" class="graphDiv">
+                    <div id="clock"></div>
+                    <div id="dateString"></div>
                 </div>
             </div>
             <div id="right">
                 <div id="current" class="graphDiv">
-                    <br>
                     <div class="graphHeading">Current Water Use</div>
                 </div>
                 <div id= "aggregate" class="graphDiv">
-                    <br>
                     <div class="graphHeading">Historical Water Use</div>
                 </div>
                 <div id="aggButton" class="graphButtonDiv">
@@ -36,13 +34,11 @@
         
         <script type="text/javascript">
             
-            var width = 900;
+            var width, barPadding, maxVals;
+
             var height = 500;
-            var barPadding = 15;
             var heightPadding = 40;
             var widthPadding = 40; 
-            var maxVals = Math.round(width/60);            
-            
             
             var refreshInterval = 15*60*1000;
             var refresh = setInterval(updateTimer, refreshInterval);
@@ -106,12 +102,13 @@
                 // by default, historical graph is aggregated only a daily basis
                 $("#" + currentAggType + "Button").addClass('selected');
                 
-                $(".graphButtonDiv").css("width", width+widthPadding/3);
-                $(".graphButtonDiv").css("height", heightPadding);
-                $("#current").css("width", width+widthPadding/3);
-                $("#aggregate").css("width", width+widthPadding/3);
-                $("#pieChart").css("width", window.innerWidth - (width+widthPadding/3) - 80);
-                $("#pieChart").css("height", height*2);
+                // use the width of the graph divs and the width padding to determine
+                // the wdith of the svg for each graph
+                width = $("#current").width() - widthPadding/3;
+                maxVals = Math.round(width/60);
+                
+                $(".graphButtonDiv").css("height", Math.max(heightPadding, 35));
+                $("#datetime").css("height", "13.5vw");
             }
             
             function updateTimer() {
@@ -138,6 +135,35 @@
                     updateCurrentGraph(msg.meters);
                 });
                 
+            }
+            
+            function startTime() {
+                var today = new Date();
+                var h = today.getHours();
+                var m = today.getMinutes();
+                var s = today.getSeconds();
+                m = checkTime(m);
+                s = checkTime(s);
+                document.getElementById('clock').innerHTML =
+                h + ":" + m + ":" + s;
+                document.getElementById('dateString').innerHTML = 
+                    monthArray[today.getMonth()] + " " + today.getDate() + ", " + today.getFullYear(); 
+                var t = setTimeout(startTime, 500);
+            }
+            
+            function checkTime(i) {
+                if (i < 10) {i = "0" + i};  // add zero in front of numbers < 10
+                return i;
+            }
+            
+            // in case of a window resize, get the new 
+            function resizeEvent() {
+                width = $("#current").width() - widthPadding/3;
+                maxVals = Math.round(width/60);
+                
+                d3.select("#current svg").attr("width", width);
+                d3.select("#aggregate svg").attr("width", width);
+                updateTimer();
             }
             
             function drawCurrentGraph(dataset){
@@ -199,7 +225,7 @@
                             "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
                             "fill" : "none",
                             "shape-rendering" : "crispEdges",
-                            "stroke" : "rgba(255,255,255,0.7)",
+                            "stroke" : "rgba(255,255,255,0.5)",
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
@@ -298,7 +324,7 @@
                             "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
                             "fill" : "none",
                             "shape-rendering" : "crispEdges",
-                            "stroke" : "rgba(255,255,255,0.7)",
+                            "stroke" : "rgba(255,255,255,0.5)",
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
@@ -480,7 +506,7 @@
                             "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
                             "fill" : "none",
                             "shape-rendering" : "crispEdges",
-                            "stroke" : "rgba(255,255,255,0.7)",
+                            "stroke" : "rgba(255,255,255,0.5)",
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
@@ -597,7 +623,7 @@
                             "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
                             "fill" : "none",
                             "shape-rendering" : "crispEdges",
-                            "stroke" : "rgba(255,255,255,0.7)",
+                            "stroke" : "rgba(255,255,255,0.5)",
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
@@ -720,6 +746,8 @@
                 this.parentNode.appendChild(this);
               });
             };
+            
+            var monthArray = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             
         </script>
     </body>
