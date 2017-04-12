@@ -9,17 +9,30 @@
     </head>
     <body>
         <div id="cover"></div>
-        <div id="current" class="graphDiv">
-            <br>
-            <div class="graphHeading">Current Water Use</div>
+        <div id="content">
+            <div id="left">
+                <div id="pieChart" class="graphDiv">
+                    <br>
+                    <div class="graphHeading">Good Evening</div>
+                </div>
+            </div>
+            <div id="right">
+                <div id="current" class="graphDiv">
+                    <br>
+                    <div class="graphHeading">Current Water Use</div>
+                </div>
+                <div id= "aggregate" class="graphDiv">
+                    <br>
+                    <div class="graphHeading">Historical Water Use</div>
+                </div>
+                <div id="aggButton" class="graphButtonDiv">
+                    <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
+                </div>
+                
+            </div>
+            <br style="clear:both;"/>
         </div>
-        <div id= "aggregate" class="graphDiv">
-            <br>
-            <div class="graphHeading">Historical Water Use</div>
-        </div>
-        <div id="aggButton" class="graphButtonDiv">
-            <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
-        </div>
+        
         
         <script type="text/javascript">
             
@@ -29,6 +42,13 @@
             var heightPadding = 40;
             var widthPadding = 40; 
             var maxVals = Math.round(width/60);            
+            
+            
+            var refreshInterval = 15*60*1000;
+            var refresh = setInterval(updateTimer, refreshInterval);
+
+            // the default aggregation type
+            var currentAggType = 'daily';
             
             $(document).ready(function() {
                 
@@ -41,7 +61,7 @@
                 });
                 
                 var requestAgg = $.ajax({
-                    url: '/sha/v1.0/readings/daily',
+                    url: '/sha/v1.0/readings/' + currentAggType,
                     data: {"max": maxVals},
                     method: 'GET'
                 });
@@ -51,7 +71,7 @@
                 });
                 
                 requestAgg.done(function (msg){
-                    drawAggGraph(msg.meters, function () {
+                    drawAggGraph(msg.meters, currentAggType, function () {
                         $("#cover").fadeOut(700);
                     });
                 });
@@ -63,20 +83,20 @@
                     $('button').removeClass('selected');
                     $(this).addClass('selected');
     
-                    var type = this.id.replace('Button', '');
+                    currentAggType = this.id.replace('Button', '');
 
                     // get the aggregated dataset of the specific range
                     var requestAgg = $.ajax({
-                            url: '/sha/v1.0/readings/' + type,
+                            url: '/sha/v1.0/readings/' + currentAggType,
                             data: {"max": maxVals},
                             method: 'GET'
                     });
                     
                     // when this request is received, update the UI to reflect the
-                    // appropriate range
+                    // new aggregation segmentation
                     requestAgg.done(function (msg){
-                        updateAggGraph(msg.meters, type);
-                    })
+                        updateAggGraph(msg.meters, currentAggType);
+                    });
                     
                 });
                 
@@ -84,12 +104,39 @@
             
             function init() {
                 // by default, historical graph is aggregated only a daily basis
-                $("#dailyButton").addClass('selected');
+                $("#" + currentAggType + "Button").addClass('selected');
                 
-                $(".graphHeading").css("width", width);
                 $(".graphButtonDiv").css("width", width+widthPadding/3);
                 $(".graphButtonDiv").css("height", heightPadding);
-                $(".graphDiv").css("width", width+widthPadding/3);
+                $("#current").css("width", width+widthPadding/3);
+                $("#aggregate").css("width", width+widthPadding/3);
+                $("#pieChart").css("width", window.innerWidth - (width+widthPadding/3) - 80);
+                $("#pieChart").css("height", height*2);
+            }
+            
+            function updateTimer() {
+                                
+                // update the current reading graph
+                var requestCurrent = $.ajax({
+                    url: '/sha/v1.0/readings/current/',
+                    data: {"max": maxVals},
+                    method: 'GET'
+                });
+                
+                // update the aggregated readings graph
+                var requestAgg = $.ajax({
+                    url: '/sha/v1.0/readings/' + currentAggType,
+                    data: {"max": maxVals},
+                    method: 'GET'
+                });
+                
+                requestAgg.done(function (msg){
+                    updateAggGraph(msg.meters, currentAggType);
+                });
+                
+                requestCurrent.done(function(msg){
+                    updateCurrentGraph(msg.meters);
+                });
                 
             }
             
@@ -152,7 +199,7 @@
                             "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
                             "fill" : "none",
                             "shape-rendering" : "crispEdges",
-                            "stroke" : "white",
+                            "stroke" : "rgba(255,255,255,0.7)",
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
@@ -213,14 +260,13 @@
     
             }
             
-            function drawAggGraph(dataset, callback) {
+            function drawAggGraph(dataset, type, callback) {
                 
-                var lastDate = getAdjustedDate(dataset[0].timestamp); 
+                var lastDate = getAdjustedDate(dataset[0].timestamp, type, true); 
                 //console.log(lastDate);
-                var firstDate = getAdjustedDate(dataset[dataset.length-1].timestamp);
+                var firstDate = getAdjustedDate(dataset[dataset.length-1].timestamp, type, false);
                 
-                // note, this only works for daily readings, what we're doing rn
-                lastDate.setDate(lastDate.getDate() + 1);
+                barPadding = width/(dataset.length*4);
                 
                 var scaleTime = d3.time.scale()
                     .domain([firstDate, lastDate])
@@ -252,7 +298,7 @@
                             "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
                             "fill" : "none",
                             "shape-rendering" : "crispEdges",
-                            "stroke" : "white",
+                            "stroke" : "rgba(255,255,255,0.7)",
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
@@ -263,7 +309,7 @@
                     .append("rect")
                     .attr({
                         "x": function(d,i){
-                            var date = getAdjustedDate(d.timestamp);
+                            var date = getAdjustedDate(d.timestamp, type, false);
                             return scaleTime(date);
                         },
                         "y": function (d){
@@ -283,7 +329,7 @@
                     .append("rect")
                     .attr({
                         "x": function(d,i){
-                            date = getAdjustedDate(d.timestamp);
+                            date = getAdjustedDate(d.timestamp, type, false);
                             return scaleTime(date);
                         },
                         "y": function (d){
@@ -305,7 +351,7 @@
                         return (d.indoor + d.outdoor).toFixed(2);
                     })
                     .attr("x", function(d){
-                        var date = getAdjustedDate(d.timestamp);
+                        var date = getAdjustedDate(d.timestamp, type, false);
                         return scaleTime(date) + ((width-widthPadding/2)/dataset.length - barPadding)/2;
                     })
                     .attr("y", function(d){
@@ -339,11 +385,146 @@
                 
                 callback();
             
-                function getAdjustedDate(timestamp){
+                function getAdjustedDate(timestamp, type, last){
                     var date = new Date(timestamp);
-                    date.setHours(24,0,0,0);
+                    
+                    if (type == 'daily') {
+                        date.setHours(24,0,0,0);
+                        if (last) date.setDate(date.getDate() + 1);
+                    }
+                    
+                    if (type == 'hourly'){
+                        if (last) date.setHours(date.getHours() + 1);
+                    }
+                    
+                    if (type == 'monthly'){
+                        date.setHours(24,0,0,0);
+                        if (last) date.setMonth(date.getMonth() + 1);
+                    }
+                    
+                    
                     return date;
                 }
+                
+            }
+            
+            function updateCurrentGraph(dataset) {
+                function getXLoc(d,i){
+                    return scaleTime(new Date(d.timestamp));
+                }
+                
+                var widthIn = ((width-widthPadding)/dataset.length)/2;
+
+                var scaleTime = d3.time.scale()
+                    .domain([new Date(dataset[dataset.length-1].timestamp), new Date(dataset[0].timestamp)])
+                    .range([widthPadding, width-widthPadding/2]);
+                
+                var scaleHeight = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d) {return Math.max(d.outdoor, d.indoor);})])
+                    .range([0, height-heightPadding*2]);
+                
+                var scaleHeightUpsideDown = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return Math.max(d.outdoor,d.indoor);})])
+                    .range([height-heightPadding*2, 0]);
+                
+                var yAxis = d3.svg.axis()
+                    .scale(scaleHeightUpsideDown)
+                    .orient("left")
+                    .ticks(5);
+                
+                var xAxis = d3.svg.axis()
+                    .scale(scaleTime)
+                    .orient("bottom")
+                    .ticks(dataset.length);
+                
+                // function for adding the connection between points
+                var valueInd = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.indoor) - heightPadding;});
+                
+                var valueOut = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.outdoor) - heightPadding;});
+                
+                var svgCurrent = d3.select("#current svg");
+                
+                var indoorCircles = svgCurrent.selectAll("#indoorCircle").data(dataset);
+                var outdoorCircles = svgCurrent.selectAll("#outdoorCircle").data(dataset);
+                var graphLines = svgCurrent.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5));
+                
+                
+                // remove unnecessary objects and add now needed ones
+                indoorCircles.exit().remove();
+                indoorCircles.enter().append("circle").attr("r", 0);
+
+                outdoorCircles.exit().remove();
+                outdoorCircles.enter().append("circle").attr("r", 0);
+                
+                graphLines.exit().remove();
+                graphLines.enter().append("line").moveToBack();
+                
+                // transition text/bars to their new values
+                graphLines.transition()
+                    .duration(750)
+                    .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "rgba(255,255,255,0.7)",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
+                
+                indoorCircles.transition()
+                    .duration(750)
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ 
+                            return height - scaleHeight(d.indoor) - heightPadding;
+                        },
+                        "r": 8,
+                        "id": "indoorCircle",
+                        "class": "indoor"
+                    });
+                
+                outdoorCircles.transition()
+                    .duration(750)
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ 
+                            return height - scaleHeight(d.outdoor) - heightPadding;
+                        },
+                        "r": 8,
+                        "id": "outdoorCircle",
+                        "class": "outdoor"
+                    });
+                
+                svgCurrent.selectAll(".indoorPath").transition()
+                    .duration(750)
+                    .attr("d", valueInd(dataset));
+                
+                svgCurrent.selectAll(".outdoorPath").transition()
+                    .duration(750)
+                    .attr("d", valueOut(dataset));
+                
+                svgCurrent.selectAll(".x.axis")                    
+                   .transition()
+                    .duration(750)
+                    .call(xAxis);
+                svgCurrent.selectAll(".y.axis") // change the y axis
+                    .transition()
+                    .duration(750)
+                    .call(yAxis);
                 
             }
             
@@ -353,6 +534,7 @@
                 var firstDate = getAdjustedDate(dataset[dataset.length-1].timestamp, type, false);
                 //console.log(firstDate);
                 
+                barPadding = width/(dataset.length*4);
                 
                 var scaleTime = d3.time.scale()
                     .domain([firstDate, lastDate])
@@ -415,7 +597,7 @@
                             "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
                             "fill" : "none",
                             "shape-rendering" : "crispEdges",
-                            "stroke" : "white",
+                            "stroke" : "rgba(255,255,255,0.7)",
                             "stroke-width" : "1px",
                             "stroke-dasharray" : "5, 5"
                         });
@@ -426,7 +608,7 @@
                         return (d.indoor + d.outdoor).toFixed(2);
                     })
                     .attr("x", function(d){
-                        var date = getAdjustedDate(d.timestamp, type);
+                        var date = getAdjustedDate(d.timestamp, type, false);
                         return scaleTime(date) + ((width-widthPadding/2)/dataset.length - barPadding)/2;
                     })
                     .attr("y", function(d){
@@ -440,7 +622,7 @@
                     .duration(750)
                     .attr({
                         "x": function(d,i){
-                            date = getAdjustedDate(d.timestamp, type);
+                            date = getAdjustedDate(d.timestamp, type, false);
                             return scaleTime(date);
                         },
                         "y": function (d){
@@ -458,7 +640,7 @@
                     .duration(750)
                     .attr({
                         "x": function(d,i){
-                            var date = getAdjustedDate(d.timestamp, type);
+                            var date = getAdjustedDate(d.timestamp, type, false);
                             return scaleTime(date);
                         },
                         "y": function (d){
@@ -472,7 +654,9 @@
                         "class": "outdoor"
                     });
                 
-                svgAgg.selectAll(".x.axis")                    // change the x axis
+                
+                // update the x and y axis
+                svgAgg.selectAll(".x.axis")                    
                    .transition()
                     .duration(750)
                     .call(xAxis);
@@ -481,6 +665,7 @@
                     .duration(750)
                     .call(yAxis);
                 
+                // move the gallons label to the front of the data
                 svgAgg.select(".yLabel").moveToFront();
                 
             
@@ -495,6 +680,12 @@
                     if (type == 'hourly'){
                         if (last) date.setHours(date.getHours() + 1);
                     }
+                    
+                    if (type == 'monthly'){
+                        date.setHours(24,0,0,0);
+                        if (last) date.setMonth(date.getMonth() + 1);
+                    }
+                    
                     
                     return date;
                 }
