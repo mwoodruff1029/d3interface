@@ -11,6 +11,7 @@ body {
     -o-background-size: cover;
     background-size: cover;
     height: 100%;
+    margin: 0;
 }
 
 p {
@@ -20,20 +21,21 @@ p {
 
 #left {
     float: left;
-    margin-left: 15px;
+    margin-left: 10px;
     /* Standard */
-    width: calc(30% - 45px);
+    width: calc(30% - 35px);
         /* Firefox */
-    width: -moz-calc(35% - 45px);
+    width: -moz-calc(35% - 35px);
     /* WebKit */
-    width: -webkit-calc(35% - 45px);
+    width: -webkit-calc(35% - 35px);
     /* Opera */
-    width: -o-calc(35% - 45px);
+    width: -o-calc(35% - 35px);
+    height: 100%;
 }
 
 #right {
     float: right;
-    margin-right: 15px;
+    margin-right: 10px;
     width: 65%;
     height: 100%;
 }
@@ -75,26 +77,58 @@ p {
     color: white;
     font-weight: 400;
     width: inherit;
-    padding-top: 20px;
+    padding-top: 2.5vh;
 }
 
 #clock {
     font-family: 'Lato', sans-serif;
     text-align: center;
-    font-size: 5.5vw;
+    font-size: 9vmin;
     color: white;
     font-weight:400;
     width: inherit;
-    padding-top: 1.3vw;
+    padding-top: 2vmin;
 }
 
 #dateString {
     font-family: 'Lato', sans-serif;
     text-align: center;
-    font-size: 2.5vw;
+    font-size: 4vmin;
     color: white;
     font-weight:300;
     width: inherit;
+}
+
+#statsString {
+    font-family: 'Lato', sans-serif;
+    text-align: center;
+    font-size: 5vmin;
+    color: white;
+    font-weight:400;
+    width: inherit;
+    padding-top: 3vh;
+    padding-bottom: 3vh;
+}
+
+#statHeading {
+    height: 10%;
+    padding-bottom: 2vh;
+}
+
+#datetime {
+    height: 20%;
+}
+
+#piechart {
+    margin-top: 0;
+    /* Standard */
+    height: calc(65% - 40px - 2vh);
+        /* Firefox */
+    height: -moz-calc(65% - 40px - 2vh);
+    /* WebKit */
+    height: -webkit-calc(65% - 40px - 2vh);
+    /* Opera */
+    height: -o-calc(65% - 40px - 2vh);
 }
 
 .graphDiv {
@@ -111,7 +145,7 @@ p {
     
     background-color: rgba(0,0,0,0.75);
     margin: 0;
-    margin-top: 15px;
+    margin-top: 13px;
 }
 
 div.bar {
@@ -125,7 +159,7 @@ div.bar {
 svg .barText {
     text-anchor: middle;
     font-family: 'Lato', sans-serif;
-    font-size: 11px;
+    font-size: 1.3vh;
     fill: white;
 }
 
@@ -141,13 +175,13 @@ svg .barText {
 .y.axis text,
 .x.axis text {
     font-family: 'Lato', sans-serif;
-    font-size: 12px;
+    font-size: 1.5vh;
     fill: rgb(255,255,255);
 }
 
 .yLabel {
     font-family: 'Lato', sans-serif;
-    font-size: 11px;
+    font-size: 1.5vh;
     fill: rgb(255,255,255);
 }
 
@@ -186,7 +220,7 @@ svg .barText {
 
 .graphButtonDiv {
     width: 100%;
-    height: inherit;
+    height: 5%;
     background-color: rgba(40,40,40,0.8);
     margin: 0 auto;
 }

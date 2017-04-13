@@ -15,8 +15,13 @@
                     <div id="clock"></div>
                     <div id="dateString"></div>
                 </div>
+                <div id ="statHeading" class="graphDiv">
+                    <div id="statsString">Home Statistics</div>
+                </div>
                 <div id="aggButton" class="graphButtonDiv">
                     <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
+                </div>
+                <div id="piechart" class="graphDiv">
                 </div>
                 
             </div>
@@ -34,10 +39,10 @@
         
         <script type="text/javascript">
             
-            var width, barPadding, maxVals, height;
+            var width, barPadding, maxVals, height, heightPadding;
 
            // var height = 500;
-            var heightPadding = 40;
+          //  var heightPadding = 40;
             var widthPadding = 40; 
             
             var refreshInterval = 15*60*1000;
@@ -105,11 +110,11 @@
                 // use the width of the graph divs and the width padding to determine
                 // the wdith of the svg for each graph
                 width = $("#current").width() - widthPadding/3;
-                height = $("#current").height() - heightPadding*1.5;
+                heightPadding = 20 + $("#current").height()/42;                
+                height = $("#current").height() - heightPadding*2;
                 maxVals = Math.round(width/60);
                 
-                $(".graphButtonDiv").css("height", Math.max(heightPadding, 35));
-                $("#datetime").css("height", "13.5vw");
+            //    $(".graphButtonDiv").css("height", Math.max(heightPadding, 35));
             }
             
             function updateTimer() {
@@ -160,7 +165,8 @@
             // in case of a window resize, get the new 
             function resizeEvent() {
                 width = $("#current").width() - widthPadding/3;
-                height = $("#current").height() - heightPadding*1.5;
+                heightPadding = 20 + $("#current").height()/42;
+                height = $("#current").height() - heightPadding*2;
                 maxVals = Math.round(width/60);
                 
                 d3.select("#current svg").attr("width", width).attr("height", height);
@@ -171,13 +177,14 @@
             function drawCurrentGraph(dataset){
                 
                 function getXLoc(d,i){
-                    return scaleTime(new Date(d.timestamp));
+                    date = getAdjustedDate(d.timestamp, 'current', false);
+                    return scaleTime(date);
                 }
                 
                 var widthIn = ((width-widthPadding)/dataset.length)/2;
 
                 var scaleTime = d3.time.scale()
-                    .domain([new Date(dataset[dataset.length-1].timestamp), new Date(dataset[0].timestamp)])
+                    .domain([getAdjustedDate(dataset[dataset.length-1].timestamp, 'current', false), getAdjustedDate(dataset[0].timestamp, 'current', false)])
                     .range([widthPadding, width-widthPadding/2]);
                 
                 var scaleHeight = d3.scale.linear()
@@ -412,39 +419,20 @@
                 addYLabel(svgAgg);
                 
                 callback();
-            
-                function getAdjustedDate(timestamp, type, last){
-                    var date = new Date(timestamp);
-                    
-                    if (type == 'daily') {
-                        date.setHours(24,0,0,0);
-                        if (last) date.setDate(date.getDate() + 1);
-                    }
-                    
-                    if (type == 'hourly'){
-                        if (last) date.setHours(date.getHours() + 1);
-                    }
-                    
-                    if (type == 'monthly'){
-                        date.setHours(24,0,0,0);
-                        if (last) date.setMonth(date.getMonth() + 1);
-                    }
-                    
-                    
-                    return date;
-                }
-                
+  
             }
             
             function updateCurrentGraph(dataset) {
+                
                 function getXLoc(d,i){
-                    return scaleTime(new Date(d.timestamp));
+                    date = getAdjustedDate(d.timestamp, 'current', false);
+                    return scaleTime(date);
                 }
                 
                 var widthIn = ((width-widthPadding)/dataset.length)/2;
 
                 var scaleTime = d3.time.scale()
-                    .domain([new Date(dataset[dataset.length-1].timestamp), new Date(dataset[0].timestamp)])
+                    .domain([getAdjustedDate(dataset[dataset.length-1].timestamp, 'current', false), getAdjustedDate(dataset[0].timestamp, 'current', false)])
                     .range([widthPadding, width-widthPadding/2]);
                 
                 var scaleHeight = d3.scale.linear()
@@ -553,6 +541,7 @@
                 svgCurrent.selectAll(".y.axis") // change the y axis
                     .transition()
                     .duration(750)
+                    .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
                     .call(yAxis);
                 
                 svgCurrent.select(".yLabel").attr("y", widthPadding + widthPadding/8)
@@ -696,6 +685,7 @@
                 svgAgg.selectAll(".y.axis") // change the y axis
                     .transition()
                     .duration(750)
+                    .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
                     .call(yAxis);
                 
                 // move the gallons label to the front of the data
@@ -703,26 +693,7 @@
                     .attr("x", -(height-heightPadding-5)).moveToFront();
                 
             
-                function getAdjustedDate(timestamp, type, last){
-                    var date = new Date(timestamp);
-                    
-                    if (type == 'daily') {
-                        date.setHours(24,0,0,0);
-                        if (last) date.setDate(date.getDate() + 1);
-                    }
-                    
-                    if (type == 'hourly'){
-                        if (last) date.setHours(date.getHours() + 1);
-                    }
-                    
-                    if (type == 'monthly'){
-                        date.setHours(24,0,0,0);
-                        if (last) date.setMonth(date.getMonth() + 1);
-                    }
-                    
-                    
-                    return date;
-                }
+                
                 
             }
             
@@ -736,6 +707,31 @@
                     .attr("transform", "rotate(-90)")
                     .text("Gallons");
             }
+            
+            function getAdjustedDate(timestamp, type, last){
+                    
+                var arr = timestamp.split(/[- :]/)
+                    var date;
+                    
+                    if (type == 'daily') {
+                        date = new Date(arr[0], arr[1]-1, arr[2]);
+                    //    date.setHours(24,0,0,0);
+                        if (last) date.setDate(date.getDate() + 1);
+                    }
+                    
+                    if (type == 'hourly' || type == 'current'){
+                        date = new Date(arr[0], arr[1]-1, arr[2], arr[3], arr[4], arr[5]);
+                        if (last) date.setHours(date.getHours() + 1);
+                    }
+                    
+                    if (type == 'monthly'){
+                        date = new Date(arr[0], arr[1]-1, arr[2]);
+                        if (last) date.setMonth(date.getMonth() + 1);
+                    } 
+                    
+                    
+                    return date;
+                }
             
             // This method at the suggestion of user Sundar on bl.ocks.org
             // link: http://bl.ocks.org/eesur/4e0a69d57d3bfc8a82c2
