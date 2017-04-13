@@ -1,11 +1,16 @@
 @import url('https://fonts.googleapis.com/css?family=Lato:300,400');
 
+html, #content{
+    height: 100%;
+}
+
 body {
     background: url(img/background.png) no-repeat center center fixed; 
     -webkit-background-size: cover;
     -moz-background-size: cover;
     -o-background-size: cover;
     background-size: cover;
+    height: 100%;
 }
 
 p {
@@ -30,6 +35,7 @@ p {
     float: right;
     margin-right: 15px;
     width: 65%;
+    height: 100%;
 }
 
 .outdoorPath { 
@@ -93,7 +99,16 @@ p {
 
 .graphDiv {
     width: 100%;
-    height: inherit;
+    
+    /* Standard */
+    height: calc(50% - 20px);
+        /* Firefox */
+    height: -moz-calc(50% - 20px);
+    /* WebKit */
+    height: -webkit-calc(50% - 20px);
+    /* Opera */
+    height: -o-calc(50% - 20px);
+    
     background-color: rgba(0,0,0,0.75);
     margin: 0;
     margin-top: 15px;

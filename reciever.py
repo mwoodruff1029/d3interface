@@ -152,7 +152,7 @@ if __name__ == "__main__":
     t.start()
     # run flask server on local ip address so it can be accessed
     # by other devices on the network that know its IP address
-    app.run(host='0.0.0.0', port='80')
+    app.run(host='0.0.0.0', port='80', threaded=True)
 
 
 

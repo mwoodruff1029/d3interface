@@ -15,6 +15,10 @@
                     <div id="clock"></div>
                     <div id="dateString"></div>
                 </div>
+                <div id="aggButton" class="graphButtonDiv">
+                    <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
+                </div>
+                
             </div>
             <div id="right">
                 <div id="current" class="graphDiv">
@@ -23,10 +27,6 @@
                 <div id= "aggregate" class="graphDiv">
                     <div class="graphHeading">Historical Water Use</div>
                 </div>
-                <div id="aggButton" class="graphButtonDiv">
-                    <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
-                </div>
-                
             </div>
             <br style="clear:both;"/>
         </div>
@@ -34,9 +34,9 @@
         
         <script type="text/javascript">
             
-            var width, barPadding, maxVals;
+            var width, barPadding, maxVals, height;
 
-            var height = 500;
+           // var height = 500;
             var heightPadding = 40;
             var widthPadding = 40; 
             
@@ -105,6 +105,7 @@
                 // use the width of the graph divs and the width padding to determine
                 // the wdith of the svg for each graph
                 width = $("#current").width() - widthPadding/3;
+                height = $("#current").height() - heightPadding*1.5;
                 maxVals = Math.round(width/60);
                 
                 $(".graphButtonDiv").css("height", Math.max(heightPadding, 35));
@@ -159,10 +160,11 @@
             // in case of a window resize, get the new 
             function resizeEvent() {
                 width = $("#current").width() - widthPadding/3;
+                height = $("#current").height() - heightPadding*1.5;
                 maxVals = Math.round(width/60);
                 
-                d3.select("#current svg").attr("width", width);
-                d3.select("#aggregate svg").attr("width", width);
+                d3.select("#current svg").attr("width", width).attr("height", height);
+                d3.select("#aggregate svg").attr("width", width).attr("height", height);
                 updateTimer();
             }
             
@@ -546,11 +548,15 @@
                 svgCurrent.selectAll(".x.axis")                    
                    .transition()
                     .duration(750)
-                    .call(xAxis);
+                    .call(xAxis)
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
                 svgCurrent.selectAll(".y.axis") // change the y axis
                     .transition()
                     .duration(750)
                     .call(yAxis);
+                
+                svgCurrent.select(".yLabel").attr("y", widthPadding + widthPadding/8)
+                    .attr("x", -(height-heightPadding-5)).moveToFront();
                 
             }
             
@@ -685,14 +691,16 @@
                 svgAgg.selectAll(".x.axis")                    
                    .transition()
                     .duration(750)
-                    .call(xAxis);
+                    .call(xAxis)
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
                 svgAgg.selectAll(".y.axis") // change the y axis
                     .transition()
                     .duration(750)
                     .call(yAxis);
                 
                 // move the gallons label to the front of the data
-                svgAgg.select(".yLabel").moveToFront();
+                svgAgg.select(".yLabel").attr("y", widthPadding + widthPadding/8)
+                    .attr("x", -(height-heightPadding-5)).moveToFront();
                 
             
                 function getAdjustedDate(timestamp, type, last){
