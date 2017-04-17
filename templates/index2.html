@@ -146,6 +146,11 @@
                     method: 'GET'
                 });
                 
+                var requestSum = $.ajax({
+                    url: '/sha/v1.0/readings/sum',
+                    method: 'GET'
+                });
+                
                 requestAgg.done(function (msg){
                     updateAggGraph(msg.meters, currentAggType);
                 });
@@ -153,6 +158,12 @@
                 requestCurrent.done(function(msg){
                     updateCurrentGraph(msg.meters);
                 });
+                
+                requestSum.done(function (msg){
+                   updatePieGraph(msg.meters); 
+                });
+                
+                updateStatSheet();
                 
             }
             
@@ -447,7 +458,8 @@
                     .attr("width", chartWidth)
                     .attr("height", chartHeight)
                     .append("g")
-                    .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight/2 + ")");
+                    .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight/2 + ")")
+                    .attr("class", "transform");
                 
                 var arc = d3.svg.arc()
 				.outerRadius(radius)
@@ -486,7 +498,7 @@
                         "r": keyRadius,
                         "cx": keyWidth*(2.4/8),
                         "cy": keyHeight/2,
-                        "fill": colors['indoor']
+                        "class": 'indoor'
                     });
                 
                 svgKey.append("text")
@@ -495,7 +507,8 @@
                         "text-anchor":"start",
                         "x": keyWidth*(2.4/8) + keyRadius*2,
                         "y": keyHeight/2 + keyRadius/2,
-                        "class": "pieLabel"
+                        "class": "pieLabel",
+                        "id": "indoorLabel"
                     });
                 
                 svgKey.append("circle")
@@ -503,7 +516,7 @@
                         "r": keyRadius,
                         "cx": keyWidth*(4.4/8),
                         "cy": keyHeight/2,
-                        "fill": colors['outdoor']
+                        "class": 'outdoor'
                     });
                 
                 svgKey.append("text")
@@ -512,7 +525,8 @@
                         "text-anchor":"start",
                         "x": keyWidth*(4.4/8) + keyRadius*2,
                         "y": keyHeight/2 + keyRadius/2,
-                        "class": "pieLabel"
+                        "class": "pieLabel",
+                        "id": "outdoorLabel"
                     });
             }
             
@@ -842,6 +856,110 @@
             
                 
                 
+            }
+            
+            function updatePieGraph(dataset) {
+                
+                
+                var chartWidth = $("#piechart").width();
+                var chartHeight = $("#piechart").height();
+                var radius = Math.min(chartWidth/2, chartHeight/2.2);
+                
+                var svgPie = d3.select("#piechart svg");
+                
+                svgPie
+                    .transition()
+                    .duration(750)
+                    .attr("width", chartWidth)
+                    .attr("height", chartHeight); 
+                
+                svgPie.selectAll(".transform")
+                    .transition()
+                    .duration(750)
+                    .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight/2 + ")");
+                
+                var arc = d3.svg.arc()
+				.outerRadius(radius)
+				.innerRadius(radius/3);
+
+                var pie = d3.layout.pie()
+                        .sort(null)
+                        .value(function(d){ return d.value; });
+
+                var g = svgPie.selectAll(".fan")
+                        .data(pie(dataset));
+                
+                g.enter().append("g").attr("class", "fan");
+
+                g.selectAll("path")
+                    .attr("d", arc)
+                    .attr("fill", function(d){ 
+                    return colors[d.data.name]; });
+                
+                var keyWidth = $("#chartKey").width();
+                var keyHeight = $("#chartKey").height();
+                var keyRadius = Math.min(keyHeight,keyWidth/5)/7;
+                
+                svgKey = d3.select("#chartKey svg");
+                
+                svgKey.select(".indoor")
+                    .transition()
+                    .duration(750)
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(2.4/8),
+                        "cy": keyHeight/2,
+                    });
+                
+                svgKey.selectAll(".pieLabel")
+                    .transition()
+                    .duration(750)
+                    .attr({
+                        "x": function() {
+                            if (this.id == "indoorLabel"){
+                                return keyWidth*(2.4/8) + keyRadius*2;
+                            } else {
+                                return keyWidth*(4.4/8) + keyRadius*2;
+                            }
+                            
+                        },
+                        "y": keyHeight/2 + keyRadius/2,
+                    });
+                
+                svgKey.select(".outdoor")
+                    .transition()
+                    .duration(750)
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(4.4/8),
+                        "cy": keyHeight/2,
+                    });
+                
+            }
+            
+            function updateStatSheet(dataset){
+                var sheetWidth = $("#statSheet").width();
+                var sheetHeight = $("#statSheet").height();
+                
+                var svgSheet = d3.select("#statSheet svg")
+                    .attr("width", sheetWidth)
+                    .attr("height", sheetHeight);
+                
+                svgSheet.selectAll(".statText")
+                    .transition()
+                    .duration(750)
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", function(d,i){
+                        return 1.5*(i+1)+"em";
+                    });
+                
+                svgSheet.selectAll(".statTextLight")
+                    .transition()
+                    .duration(750)
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", function(d,i){
+                        return 1.5*(i+1)+"em";
+                    });
             }
             
             function addYLabel(svg){
