@@ -51,10 +51,9 @@ class Water_usage(db.Model):
         def __init__(self, outdoor, indoor, ts):
             self.outdoor = outdoor
             self.indoor = indoor
-            # we won't require an id value until we figure out what we want this value
-            # to actually represent 
+            # we won't require an id value because this just self increments
             #self.id = id
-            self.ts = datetime.datetime.strptime(ts, '%m/%d/%y %H:%M')
+            self.ts = datetime.datetime.strptime(ts, '%m/%d/%Y %H:%M')
 
         @property
         def serialize(self):
@@ -126,6 +125,16 @@ def get_daily_readings():
         db.func.sum(Water_usage.indoor),
         cast(Water_usage.ts,Date)).group_by(cast(Water_usage.ts, Date)).order_by(cast(Water_usage.ts,Date).desc()).limit(max)
     return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(i[2])} for i in agg])
+
+@app.route("/sha/v1.0/readings/sum", methods=['GET'])
+def get_sum_readings():
+
+    sum = db.session.query(
+        db.func.sum(Water_usage.outdoor),
+        db.func.sum(Water_usage.indoor)
+    )
+    return jsonify(meters=[{'name': 'outdoor', 'value':float(str(sum[0][0]))}, {'name': 'indoor', 'value': float(str(sum[0][1]))}])
+#    return jsonify(meters=[{'name': 'outdoor', 'value':800}, {'name': 'indoor', 'value': float(str(sum[0][1]))}])
 
 # this returns the most current readings, up to a max submitted by the requester
 # the default max is 10

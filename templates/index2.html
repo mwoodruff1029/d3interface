@@ -21,9 +21,13 @@
                 <div id="aggButton" class="graphButtonDiv">
                     <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
                 </div>
+                <div id="break" class="graphDiv"></div>
                 <div id="piechart" class="graphDiv">
                 </div>
-                
+                <div id="chartKey" class="graphDiv">
+                </div>
+                <div id="statSheet" class="graphDiv">
+                </div>
             </div>
             <div id="right">
                 <div id="current" class="graphDiv">
@@ -45,7 +49,7 @@
           //  var heightPadding = 40;
             var widthPadding = 40; 
             
-            var refreshInterval = 15*60*1000;
+            var refreshInterval = 60*1000;
             var refresh = setInterval(updateTimer, refreshInterval);
 
             // the default aggregation type
@@ -67,6 +71,11 @@
                     method: 'GET'
                 });
                 
+                var requestSum = $.ajax({
+                    url: '/sha/v1.0/readings/sum',
+                    method: 'GET'
+                });
+                
                 requestCurrent.done(function (msg) {
                     drawCurrentGraph(msg.meters);
                 });
@@ -75,7 +84,13 @@
                     drawAggGraph(msg.meters, currentAggType, function () {
                         $("#cover").fadeOut(700);
                     });
+                    
+                    drawStatSheet(msg.meters);
                 });
+                
+                requestSum.done(function (msg){
+                    drawPieGraph(msg.meters);
+                })
                 
                 // listener for changing the aggregated dataset between
                 // daily, hourly, and monthly aggregation
@@ -113,8 +128,6 @@
                 heightPadding = 20 + $("#current").height()/42;                
                 height = $("#current").height() - heightPadding*2;
                 maxVals = Math.round(width/60);
-                
-            //    $(".graphButtonDiv").css("height", Math.max(heightPadding, 35));
             }
             
             function updateTimer() {
@@ -145,7 +158,8 @@
             
             function startTime() {
                 var today = new Date();
-                var h = today.getHours();
+                var h = today.getHours()%12;
+                if (h == 0) h = 12;
                 var m = today.getMinutes();
                 var s = today.getSeconds();
                 m = checkTime(m);
@@ -254,6 +268,16 @@
                         "class": "outdoor"
                     });
                 
+                var valueOut = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.outdoor) - heightPadding;});
+                
+                svgCurrent.append("path")
+                    .attr("class", "outdoorPath")
+                    .attr("d", valueOut(dataset));
+                
                 // add the indoor data points
                 svgCurrent.selectAll("#indoorCircle")
                     .data(dataset)
@@ -274,20 +298,12 @@
                     })
                     .y(function(d){return height - scaleHeight(d.indoor) - heightPadding;});
                 
-                var valueOut = d3.svg.line()
-                    .x(function(d, i) { 
-                        return getXLoc(d,i);
-                    })
-                    .y(function(d){return height - scaleHeight(d.outdoor) - heightPadding;});
                 
                 // append the paths between points
                 svgCurrent.append("path")
                     .attr("class", "indoorPath")
-                    .attr("d", valueInd(dataset));
-                
-                svgCurrent.append("path")
-                    .attr("class", "outdoorPath")
-                    .attr("d", valueOut(dataset));
+                    .attr("d", valueInd(dataset))
+                    .moveToFront();
                 
                
                 addYLabel(svgCurrent);
@@ -420,6 +436,137 @@
                 
                 callback();
   
+            }
+            
+            function drawPieGraph(dataset) {
+                var chartWidth = $("#piechart").width();
+                var chartHeight = $("#piechart").height();
+                var radius = Math.min(chartWidth/2, chartHeight/2.2);
+                
+                var svgPie = d3.select("#piechart").append("svg")
+                    .attr("width", chartWidth)
+                    .attr("height", chartHeight)
+                    .append("g")
+                    .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight/2 + ")");
+                
+                var arc = d3.svg.arc()
+				.outerRadius(radius)
+				.innerRadius(radius/3);
+
+                var pie = d3.layout.pie()
+                        .sort(null)
+                        .value(function(d){ return d.value; });
+
+                var g = svgPie.selectAll(".fan")
+                        .data(pie(dataset))
+                        .enter()
+                        .append("g")
+                        .attr("class", "fan");
+                
+                colors = {};
+                    colors['indoor'] = 'rgb(249,189,83)';
+                    colors['outdoor'] = 'rgb(75,201,150)';
+                
+                g.append("path")
+                    .attr("d", arc)
+                    .attr("fill", function(d){ 
+                    return colors[d.data.name]; });
+                
+                var keyWidth = $("#chartKey").width();
+                var keyHeight = $("#chartKey").height();
+                    
+                var svgKey = d3.select("#chartKey").append("svg")
+                    .attr("width", keyWidth)
+                    .attr("height", keyHeight);
+                
+                var keyRadius = Math.min(keyHeight,keyWidth/5)/7;
+                
+                svgKey.append("circle")
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(2.4/8),
+                        "cy": keyHeight/2,
+                        "fill": colors['indoor']
+                    });
+                
+                svgKey.append("text")
+                    .text("indoor")
+                    .attr({
+                        "text-anchor":"start",
+                        "x": keyWidth*(2.4/8) + keyRadius*2,
+                        "y": keyHeight/2 + keyRadius/2,
+                        "class": "pieLabel"
+                    });
+                
+                svgKey.append("circle")
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(4.4/8),
+                        "cy": keyHeight/2,
+                        "fill": colors['outdoor']
+                    });
+                
+                svgKey.append("text")
+                    .text("outdoor")
+                    .attr({
+                        "text-anchor":"start",
+                        "x": keyWidth*(4.4/8) + keyRadius*2,
+                        "y": keyHeight/2 + keyRadius/2,
+                        "class": "pieLabel"
+                    });
+            }
+            
+            function drawStatSheet(dataset) {
+                var sheetWidth = $("#statSheet").width();
+                var sheetHeight = $("#statSheet").height();
+                
+                var svgSheet = d3.select("#statSheet").append("svg")
+                    .attr("width", sheetWidth)
+                    .attr("height", sheetHeight);
+                
+                svgSheet.append("text")
+                    .text("daily average:")
+                    .attr("class", "statText")
+                    .attr("text-anchor", "end")
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", "1.5em");
+                
+                svgSheet.append("text")
+                    .text("daily min:")
+                    .attr("class", "statText")
+                    .attr("text-anchor", "end")
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", "3em");
+                
+                svgSheet.append("text")
+                    .text("daily max:")
+                    .attr("class", "statText")
+                    .attr("text-anchor", "end")
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", "4.5em");
+                
+                svgSheet.append("text")
+                    .text("150.62 gallons")
+                    .attr("class", "statTextLight")
+                    .attr("text-anchor", "start")
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", "1.5em");
+                
+                svgSheet.append("text")
+                    .text("134.05 gallons")
+                    .attr("class", "statTextLight")
+                    .attr("text-anchor", "start")
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", "3em");
+                
+                svgSheet.append("text")
+                    .text("177.10 gallons")
+                    .attr("class", "statTextLight")
+                    .attr("text-anchor", "start")
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", "4.5em");
+                
+                
             }
             
             function updateCurrentGraph(dataset) {
