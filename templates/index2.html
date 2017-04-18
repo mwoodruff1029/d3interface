@@ -76,6 +76,12 @@
                     method: 'GET'
                 });
                 
+                var requestStats = $.ajax({
+                    url: '/sha/v1.0/readings/stats',
+                    data: {"aggregation": currentAggType},
+                    method: 'GET'
+                });
+                
                 requestCurrent.done(function (msg) {
                     drawCurrentGraph(msg.meters);
                 });
@@ -84,8 +90,10 @@
                     drawAggGraph(msg.meters, currentAggType, function () {
                         $("#cover").fadeOut(700);
                     });
-                    
-                    drawStatSheet(msg.meters);
+                });
+                
+                requestStats.done(function(msg){
+                   drawStatSheet(msg.meters); 
                 });
                 
                 requestSum.done(function (msg){
@@ -106,6 +114,16 @@
                             url: '/sha/v1.0/readings/' + currentAggType,
                             data: {"max": maxVals},
                             method: 'GET'
+                    });
+                    
+                    var requestStat = $.ajax({
+                        url: '/sha/v1.0/readings/stats',
+                        data: {"aggregation": currentAggType},
+                        method: 'GET'
+                    });
+                    
+                    requestStat.done(function(msg){
+                        updateStatSheet(msg.meters);    
                     });
                     
                     // when this request is received, update the UI to reflect the
@@ -151,6 +169,12 @@
                     method: 'GET'
                 });
                 
+                var requestStats = $.ajax({
+                    url: '/sha/v1.0/readings/stats',
+                    data: {"aggregation": currentAggType},
+                    method: 'GET'
+                });
+                
                 requestAgg.done(function (msg){
                     updateAggGraph(msg.meters, currentAggType);
                 });
@@ -163,7 +187,10 @@
                    updatePieGraph(msg.meters); 
                 });
                 
-                updateStatSheet();
+                requestStats.done(function (msg){
+                    updateStatSheet(msg.meters);
+                });
+                
                 
             }
             
@@ -539,21 +566,21 @@
                     .attr("height", sheetHeight);
                 
                 svgSheet.append("text")
-                    .text("daily average:")
+                    .text(currentAggType + " average:")
                     .attr("class", "statText")
                     .attr("text-anchor", "end")
                     .attr("x", sheetWidth/2-2)
                     .attr("y", "1.5em");
                 
                 svgSheet.append("text")
-                    .text("daily min:")
+                    .text(currentAggType + " min:")
                     .attr("class", "statText")
                     .attr("text-anchor", "end")
                     .attr("x", sheetWidth/2-2)
                     .attr("y", "3em");
                 
                 svgSheet.append("text")
-                    .text("daily max:")
+                    .text(currentAggType + " max:")
                     .attr("class", "statText")
                     .attr("text-anchor", "end")
                     .attr("x", sheetWidth/2-2)
@@ -567,14 +594,14 @@
                     .attr("y", "1.5em");
                 
                 svgSheet.append("text")
-                    .text("134.05 gallons")
+                    .text(dataset.min.toFixed(2) + " gallons")
                     .attr("class", "statTextLight")
                     .attr("text-anchor", "start")
                     .attr("x", sheetWidth/2+2)
                     .attr("y", "3em");
                 
                 svgSheet.append("text")
-                    .text("177.10 gallons")
+                    .text(dataset.max.toFixed(2) + " gallons")
                     .attr("class", "statTextLight")
                     .attr("text-anchor", "start")
                     .attr("x", sheetWidth/2+2)
@@ -938,6 +965,9 @@
             }
             
             function updateStatSheet(dataset){
+                
+                var order = ['average', 'min', 'max'];
+                
                 var sheetWidth = $("#statSheet").width();
                 var sheetHeight = $("#statSheet").height();
                 
@@ -948,6 +978,9 @@
                 svgSheet.selectAll(".statText")
                     .transition()
                     .duration(750)
+                    .text(function(d,i){
+                        return currentAggType + " " + order[i] + ": ";
+                    })
                     .attr("x", sheetWidth/2-2)
                     .attr("y", function(d,i){
                         return 1.5*(i+1)+"em";
@@ -956,6 +989,9 @@
                 svgSheet.selectAll(".statTextLight")
                     .transition()
                     .duration(750)
+                    .text(function(d,i){
+                        return parseFloat(dataset[order[i]]).toFixed(2) + " gal";
+                    })
                     .attr("x", sheetWidth/2+2)
                     .attr("y", function(d,i){
                         return 1.5*(i+1)+"em";

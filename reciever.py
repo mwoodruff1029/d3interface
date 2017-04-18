@@ -134,7 +134,45 @@ def get_sum_readings():
         db.func.sum(Water_usage.indoor)
     )
     return jsonify(meters=[{'name': 'outdoor', 'value':float(str(sum[0][0]))}, {'name': 'indoor', 'value': float(str(sum[0][1]))}])
-#    return jsonify(meters=[{'name': 'outdoor', 'value':800}, {'name': 'indoor', 'value': float(str(sum[0][1]))}])
+
+@app.route("/sha/v1.0/readings/stats", methods=['GET'])
+def get_reading_stats():
+    data = request.args
+    if ('aggregation' in data.keys()):
+        agg = ''
+        average = ''
+        
+        total = db.session.query(
+            db.func.sum(Water_usage.outdoor + Water_usage.indoor)
+        )
+
+        totalCount = db.session.query(Water_usage).count()
+
+        if(data['aggregation'] == 'hourly'):
+            agg = db.session.query(
+                db.func.sum(Water_usage.outdoor + Water_usage.indoor),
+                db.func.date_part('hour', Water_usage.ts),
+                cast(Water_usage.ts,Date)).group_by(db.func.date_part('hour',Water_usage.ts), cast(Water_usage.ts,Date)).order_by(db.func.sum(Water_usage.outdoor + Water_usage.indoor).desc())     
+
+        elif (data['aggregation'] == 'daily'):
+            agg = db.session.query(
+                db.func.sum(Water_usage.outdoor + Water_usage.indoor),
+                cast(Water_usage.ts,Date)).group_by(cast(Water_usage.ts, Date)).order_by(db.func.sum(Water_usage.outdoor+Water_usage.indoor).desc())
+        else:
+            agg = db.session.query(
+                db.func.sum(Water_usage.outdoor + Water_usage.indoor),
+                db.func.date_part('month', Water_usage.ts),
+                db.func.date_part('year', Water_usage.ts)).group_by(db.func.date_part('month',Water_usage.ts), db.func.date_part('year',Water_usage.ts)).order_by(db.func.sum(Water_usage.outdoor + Water_usage.indoor).desc())
+        
+        sum = 0
+        for i in agg:
+            sum = sum + float(str(i[0]))
+        average = sum/agg.count()
+
+        return jsonify(meters={'average':average, 'max': float(str(agg[0][0])), 'min': float(str(agg[agg.count()-1][0]))})
+    
+    else: 
+        return "error"
 
 # this returns the most current readings, up to a max submitted by the requester
 # the default max is 10
