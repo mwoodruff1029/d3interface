@@ -1,32 +1,1103 @@
 <!DOCTYPE html>
-<style>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <title>Smart Home Analytics</title>
+        <script src="http://d3js.org/d3.v3.min.js"  charset="utf-8"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+        <link rel="stylesheet" href="{{ url_for('static', filename='stylesheets/style.css') }}">
+    </head>
+    <body onresize="resizeEvent()" onload="startTime()">
+        <div id="cover"></div>
+        <div id="content">
+            <div id="left">
+                <div id="datetime" class="graphDiv">
+                    <div id="clock"></div>
+                    <div id="dateString"></div>
+                </div>
+                <div id ="statHeading" class="graphDiv">
+                    <div id="statsString">Home Statistics</div>
+                </div>
+                <div id="aggButton" class="graphButtonDiv">
+                    <button class="button" id="hourlyButton">Hourly</button><button class="button" id="dailyButton">Daily</button><button class="button" id="monthlyButton">Monthly</button>
+                </div>
+                <div id="break" class="graphDiv"></div>
+                <div id="piechart" class="graphDiv">
+                </div>
+                <div id="chartKey" class="graphDiv">
+                </div>
+                <div id="statSheet" class="graphDiv">
+                </div>
+            </div>
+            <div id="right">
+                <div id="current" class="graphDiv">
+                    <div class="graphHeading">Current Water Use</div>
+                </div>
+                <div id= "aggregate" class="graphDiv">
+                    <div class="graphHeading">Historical Water Use</div>
+                </div>
+            </div>
+            <br style="clear:both;"/>
+        </div>
+        
+        
+        <script type="text/javascript">
+            
+            var width, barPadding, maxVals, height, heightPadding;
+            
+            // this allows room for the y axis
+            var widthPadding = 50; 
+            
+            // this dictates how often the UI will check for new data
+            // in the database and update
+            var refreshInterval = 60*1000;
+            var refresh = setInterval(updateTimer, refreshInterval);
+
+            // the default aggregation type
+            var currentAggType = 'daily';
+            
+            $(document).ready(function() {
+                
+                init();
+
+            });
+            
+            function init() {
+                // by default, historical graph is aggregated only a daily basis
+                $("#" + currentAggType + "Button").addClass('selected');
+                
+                // use the width of the graph divs and the width padding to determine
+                // the wdith of the svg for each graph
+                width = $("#current").width() - widthPadding/3;
+                heightPadding = 20 + $("#current").height()/42;                
+                height = $("#current").height() - heightPadding*2;
+                maxVals = Math.round(width/60);
+                
+                // request the current data
+                var requestCurrent = $.ajax({
+                    url: '/sha/v1.0/readings/current/',
+                    data: {"max": maxVals},
+                    method: 'GET'
+                });
+                
+                // request the data aggregated by the default aggregation type
+                var requestAgg = $.ajax({
+                    url: '/sha/v1.0/readings/' + currentAggType,
+                    data: {"max": maxVals},
+                    method: 'GET'
+                });
+                
+                // request the sum statistics
+                var requestSum = $.ajax({
+                    url: '/sha/v1.0/readings/sum',
+                    method: 'GET'
+                });
+                
+                // request the overall water use statistics
+                var requestStats = $.ajax({
+                    url: '/sha/v1.0/readings/stats',
+                    data: {"aggregation": currentAggType},
+                    method: 'GET'
+                });
+                
+                // when these requests return, draw the graphs
+                requestCurrent.done(function (msg) {
+                    drawCurrentGraph(msg.meters);
+                });
+                
+                requestAgg.done(function (msg){
+                    drawAggGraph(msg.meters, currentAggType, function () {
+                        $("#cover").fadeOut(700);
+                    });
+                });
+                
+                requestStats.done(function(msg){
+                   drawStatSheet(msg.meters); 
+                });
+                
+                requestSum.done(function (msg){
+                    drawPieGraph(msg.meters);
+                });
+                
+                // listener for changing the aggregated dataset between
+                // daily, hourly, and monthly aggregation
+                $('button').on('click', function(){
+                    
+                    $('button').removeClass('selected');
+                    $(this).addClass('selected');
     
-.chart div {
-  font: 10px sans-serif;
-  background-color: steelblue;
-  text-align: right;
-  padding: 3px;
-  margin: 1px;
-  color: white;
-}
+                    currentAggType = this.id.replace('Button', '');
+
+                    // get the aggregated dataset of the specific range
+                    var requestAgg = $.ajax({
+                            url: '/sha/v1.0/readings/' + currentAggType,
+                            data: {"max": maxVals},
+                            method: 'GET'
+                    });
+                    
+                    var requestStat = $.ajax({
+                        url: '/sha/v1.0/readings/stats',
+                        data: {"aggregation": currentAggType},
+                        method: 'GET'
+                    });
+                    
+                    requestStat.done(function(msg){
+                        updateStatSheet(msg.meters);    
+                    });
+                    
+                    // when this request is received, update the UI to reflect the
+                    // new aggregation segmentation
+                    requestAgg.done(function (msg){
+                        updateAggGraph(msg.meters, currentAggType);
+                    });
+                    
+                });
+                
+            }
+            
+            function updateTimer() {
+                                
+                // update the current reading graph
+                var requestCurrent = $.ajax({
+                    url: '/sha/v1.0/readings/current/',
+                    data: {"max": maxVals},
+                    method: 'GET'
+                });
+                
+                // update the aggregated readings graph
+                var requestAgg = $.ajax({
+                    url: '/sha/v1.0/readings/' + currentAggType,
+                    data: {"max": maxVals},
+                    method: 'GET'
+                });
+                
+                // update the sum and stats
+                var requestSum = $.ajax({
+                    url: '/sha/v1.0/readings/sum',
+                    method: 'GET'
+                });
+                
+                var requestStats = $.ajax({
+                    url: '/sha/v1.0/readings/stats',
+                    data: {"aggregation": currentAggType},
+                    method: 'GET'
+                });
+                
+                requestAgg.done(function (msg){
+                    updateAggGraph(msg.meters, currentAggType);
+                });
+                
+                requestCurrent.done(function(msg){
+                    updateCurrentGraph(msg.meters);
+                });
+                
+                requestSum.done(function (msg){
+                   updatePieGraph(msg.meters); 
+                });
+                
+                requestStats.done(function (msg){
+                    updateStatSheet(msg.meters);
+                });
+                
+                
+            }
+            
+            function startTime() {
+                var today = new Date();
+                var h = today.getHours()%12;
+                if (h == 0) h = 12;
+                var m = today.getMinutes();
+                var s = today.getSeconds();
+                m = checkTime(m);
+                s = checkTime(s);
+                document.getElementById('clock').innerHTML =
+                h + ":" + m + ":" + s;
+                document.getElementById('dateString').innerHTML = 
+                    monthArray[today.getMonth()] + " " + today.getDate() + ", " + today.getFullYear(); 
+                var t = setTimeout(startTime, 500);
+            }
+            
+            function checkTime(i) {
+                if (i < 10) {i = "0" + i};  // add zero in front of numbers < 10
+                return i;
+            }
+            
+            // in case of a window resize, get the new 
+            function resizeEvent() {
+                width = $("#current").width() - widthPadding/3;
+                heightPadding = 20 + $("#current").height()/42;
+                height = $("#current").height() - heightPadding*2;
+                maxVals = Math.round(width/60);
+                
+                d3.select("#current svg").attr("width", width).attr("height", height);
+                d3.select("#aggregate svg").attr("width", width).attr("height", height);
+                updateTimer();
+            }
+            
+            /*
+            This method draws the "Current Water Use" graph that is located in the right column
+            of the screen
+            */
+            function drawCurrentGraph(dataset){
+                
+                function getXLoc(d,i){
+                    date = getAdjustedDate(d.timestamp, 'current', false);
+                    return scaleTime(date);
+                }
+                
+                var widthIn = ((width-widthPadding)/dataset.length)/2;
+
+                var scaleTime = d3.time.scale()
+                    .domain([getAdjustedDate(dataset[dataset.length-1].timestamp, 'current', false), getAdjustedDate(dataset[0].timestamp, 'current', false)])
+                    .range([widthPadding, width-widthPadding/2]);
+                
+                var scaleHeight = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d) {return Math.max(d.outdoor, d.indoor);})])
+                    .range([0, height-heightPadding*2]);
+                
+                var scaleHeightUpsideDown = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return Math.max(d.outdoor,d.indoor);})])
+                    .range([height-heightPadding*2, 0]);
+                
+                var svgCurrent = d3.select("#current")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+                
+                 var yAxis = d3.svg.axis()
+                    .scale(scaleHeightUpsideDown)
+                    .orient("left")
+                    .ticks(5);
+                
+                var xAxis = d3.svg.axis()
+                    .scale(scaleTime)
+                    .orient("bottom")
+                    .ticks(dataset.length);
+                
+                svgCurrent.append("g")
+                    .attr("class", "x axis")
+                    .call(xAxis)
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
+                
+                svgCurrent.append("g")
+                    .attr("class", "y axis")
+                    .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
+                    .call(yAxis);
+                
+                // add the gridlines
+                svgCurrent.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5))
+                    .enter()
+                    .append("line")
+                        .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "rgba(255,255,255,0.5)",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
+                
+                // add the outdoor data points
+                svgCurrent.selectAll("#outdoorCircle")
+                    .data(dataset)
+                    .enter()
+                    .append("circle")
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ 
+                            return height - scaleHeight(d.outdoor) - heightPadding;
+                        },
+                        "r": 8,
+                        "id": "outdoorCircle",
+                        "class": "outdoor"
+                    });
+                
+                var valueOut = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.outdoor) - heightPadding;});
+                
+                svgCurrent.append("path")
+                    .attr("class", "outdoorPath")
+                    .attr("d", valueOut(dataset));
+                
+                // add the indoor data points
+                svgCurrent.selectAll("#indoorCircle")
+                    .data(dataset)
+                    .enter()
+                    .append("circle")
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ return height - scaleHeight(d.indoor) - heightPadding;},
+                        "r": 8,
+                        "id": "indoorCircle",
+                        "class": "indoor"
+                    });
+                
+                // function for adding the connection between points
+                var valueInd = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.indoor) - heightPadding;});
+                
+                
+                // append the paths between points
+                svgCurrent.append("path")
+                    .attr("class", "indoorPath")
+                    .attr("d", valueInd(dataset))
+                    .moveToFront();
+                
+               
+                addYLabel(svgCurrent);
+                
     
-</style>
+            }
+            
+            /*
+            This method draws the "Historical Water Use" graph that is located in the right column
+            of the screen
+            */
+            function drawAggGraph(dataset, type, callback) {
+                
+                var lastDate = getAdjustedDate(dataset[0].timestamp, type, true); 
+                //console.log(lastDate);
+                var firstDate = getAdjustedDate(dataset[dataset.length-1].timestamp, type, false);
+                
+                barPadding = width/(dataset.length*4);
+                
+                var scaleTime = d3.time.scale()
+                    .domain([firstDate, lastDate])
+                    .range([widthPadding, width-widthPadding/2]);
+                
+                var scaleHeight = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
+                    .range([0, height-heightPadding*2]);
 
-<div class="chart"></div>
-<script src="http://d3js.org/d3.v3.min.js"  charset="utf-8"></script>
+                var scaleHeightUpsideDown = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
+                    .range([height-heightPadding*2, 0]);
+                
+                var svgAgg = d3.select("#aggregate")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+                
+                svgAgg.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5))
+                    .enter()
+                    .append("line")
+                        .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "rgba(255,255,255,0.5)",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
+                
+                svgAgg.selectAll("#outdoorRect")
+                    .data(dataset)
+                    .enter()
+                    .append("rect")
+                    .attr({
+                        "x": function(d,i){
+                            var date = getAdjustedDate(d.timestamp, type, false);
+                            return scaleTime(date);
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.outdoor) - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.outdoor);
+                        },
+                        "id": "outdoorRect",
+                        "class": "outdoor"
+                    });
+                
+                svgAgg.selectAll("#indoorRect")
+                    .data(dataset)
+                    .enter()
+                    .append("rect")
+                    .attr({
+                        "x": function(d,i){
+                            date = getAdjustedDate(d.timestamp, type, false);
+                            return scaleTime(date);
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.indoor);
+                        },
+                        "id": "indoorRect",
+                        "class": "indoor"
+                    });
+                
+                svgAgg.selectAll(".barText")
+                    .data(dataset)
+                    .enter()
+                    .append("text")
+                    .text(function(d){
+                        return (d.indoor + d.outdoor).toFixed(2);
+                    })
+                    .attr("x", function(d){
+                        var date = getAdjustedDate(d.timestamp, type, false);
+                        return scaleTime(date) + ((width-widthPadding/2)/dataset.length - barPadding)/2;
+                    })
+                    .attr("y", function(d){
+                        return height - scaleHeight(d.indoor) - scaleHeight(d.outdoor) - heightPadding*4/3;
+                    })
+                    .attr("class", "barText")
+                    .attr("text-anchor", "middle");
+                
+                var yAxis = d3.svg.axis()
+                    .scale(scaleHeightUpsideDown)
+                    .orient("left")
+                    .ticks(5);
+                
+                var xAxis = d3.svg.axis()
+                    .scale(scaleTime)
+                    .orient("bottom")
+                    .ticks(dataset.length + 1);
+                
+                svgAgg.append("g")
+                    .attr("class", "y axis")
+                    .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
+                    .call(yAxis);
+                
+                svgAgg.append("g")
+                    .attr("class", "x axis")
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")")
+                    .call(xAxis);
+                    
+                
+                addYLabel(svgAgg);
+                
+                callback();
+  
+            }
+            
+            /*
+            This method draws the pie graph that is located in the left column of the interface
+            */
+            function drawPieGraph(dataset) {
+                var chartWidth = $("#piechart").width();
+                var chartHeight = $("#piechart").height();
+                var radius = Math.min(chartWidth/2, chartHeight/2.2);
+                
+                var svgPie = d3.select("#piechart").append("svg")
+                    .attr("width", chartWidth)
+                    .attr("height", chartHeight)
+                    .append("g")
+                    .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight/2 + ")")
+                    .attr("class", "transform");
+                
+                var arc = d3.svg.arc()
+				.outerRadius(radius)
+				.innerRadius(radius/3);
 
-<script>
-    var data = [4, 8, 15, 16, 23, 42];
+                var pie = d3.layout.pie()
+                        .sort(null)
+                        .value(function(d){ return d.value; });
 
-    var x = d3.scale.linear()
-        .domain([0, 420])
-        .range([0, d3.max(data)]);
+                var g = svgPie.selectAll(".fan")
+                        .data(pie(dataset))
+                        .enter()
+                        .append("g")
+                        .attr("class", "fan");
+                
+                colors = {};
+                    colors['indoor'] = 'rgb(249,189,83)';
+                    colors['outdoor'] = 'rgb(75,201,150)';
+                
+                g.append("path")
+                    .attr("d", arc)
+                    .attr("fill", function(d){ 
+                    return colors[d.data.name]; });
+                
+                var keyWidth = $("#chartKey").width();
+                var keyHeight = $("#chartKey").height();
+                    
+                var svgKey = d3.select("#chartKey").append("svg")
+                    .attr("width", keyWidth)
+                    .attr("height", keyHeight);
+                
+                var keyRadius = Math.min(keyHeight,keyWidth/5)/7;
+                
+                svgKey.append("circle")
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(2.4/8),
+                        "cy": keyHeight/2,
+                        "class": 'indoor'
+                    });
+                
+                svgKey.append("text")
+                    .text("indoor")
+                    .attr({
+                        "text-anchor":"start",
+                        "x": keyWidth*(2.4/8) + keyRadius*2,
+                        "y": keyHeight/2 + keyRadius/2,
+                        "class": "pieLabel",
+                        "id": "indoorLabel"
+                    });
+                
+                svgKey.append("circle")
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(4.4/8),
+                        "cy": keyHeight/2,
+                        "class": 'outdoor'
+                    });
+                
+                svgKey.append("text")
+                    .text("outdoor")
+                    .attr({
+                        "text-anchor":"start",
+                        "x": keyWidth*(4.4/8) + keyRadius*2,
+                        "y": keyHeight/2 + keyRadius/2,
+                        "class": "pieLabel",
+                        "id": "outdoorLabel"
+                    });
+            }
+            
+            /*
+            This method determines the home statistcs that are listed in the left column of the interface
+            */
+            
+            function drawStatSheet(dataset) {
+                var sheetWidth = $("#statSheet").width();
+                var sheetHeight = $("#statSheet").height();
+                
+                var svgSheet = d3.select("#statSheet").append("svg")
+                    .attr("width", sheetWidth)
+                    .attr("height", sheetHeight);
+                
+                svgSheet.append("text")
+                    .text(currentAggType + " average:")
+                    .attr("class", "statText")
+                    .attr("text-anchor", "end")
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", "1.5em");
+                
+                svgSheet.append("text")
+                    .text(currentAggType + " min:")
+                    .attr("class", "statText")
+                    .attr("text-anchor", "end")
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", "3em");
+                
+                svgSheet.append("text")
+                    .text(currentAggType + " max:")
+                    .attr("class", "statText")
+                    .attr("text-anchor", "end")
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", "4.5em");
+                
+                svgSheet.append("text")
+                    .text("150.62 gallons")
+                    .attr("class", "statTextLight")
+                    .attr("text-anchor", "start")
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", "1.5em");
+                
+                svgSheet.append("text")
+                    .text(dataset.min.toFixed(2) + " gallons")
+                    .attr("class", "statTextLight")
+                    .attr("text-anchor", "start")
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", "3em");
+                
+                svgSheet.append("text")
+                    .text(dataset.max.toFixed(2) + " gallons")
+                    .attr("class", "statTextLight")
+                    .attr("text-anchor", "start")
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", "4.5em");
+                
+                
+            }
+            
+            /*
+                This method updates the "Current Water Use" graph with new data
+            */
+            function updateCurrentGraph(dataset) {
+                
+                function getXLoc(d,i){
+                    date = getAdjustedDate(d.timestamp, 'current', false);
+                    return scaleTime(date);
+                }
+                
+                var widthIn = ((width-widthPadding)/dataset.length)/2;
 
-    d3.select(".chart")
-      .selectAll("div")
-        .data(data)
-      .enter().append("div")
-        .style(function(d) { return x(d) + "px"; }, "height")
-        .text(function(d) { return d; });
-    
-</script>
+                var scaleTime = d3.time.scale()
+                    .domain([getAdjustedDate(dataset[dataset.length-1].timestamp, 'current', false), getAdjustedDate(dataset[0].timestamp, 'current', false)])
+                    .range([widthPadding, width-widthPadding/2]);
+                
+                var scaleHeight = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d) {return Math.max(d.outdoor, d.indoor);})])
+                    .range([0, height-heightPadding*2]);
+                
+                var scaleHeightUpsideDown = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return Math.max(d.outdoor,d.indoor);})])
+                    .range([height-heightPadding*2, 0]);
+                
+                var yAxis = d3.svg.axis()
+                    .scale(scaleHeightUpsideDown)
+                    .orient("left")
+                    .ticks(5);
+                
+                var xAxis = d3.svg.axis()
+                    .scale(scaleTime)
+                    .orient("bottom")
+                    .ticks(dataset.length);
+                
+                // function for adding the connection between points
+                var valueInd = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.indoor) - heightPadding;});
+                
+                var valueOut = d3.svg.line()
+                    .x(function(d, i) { 
+                        return getXLoc(d,i);
+                    })
+                    .y(function(d){return height - scaleHeight(d.outdoor) - heightPadding;});
+                
+                var svgCurrent = d3.select("#current svg");
+                
+                var indoorCircles = svgCurrent.selectAll("#indoorCircle").data(dataset);
+                var outdoorCircles = svgCurrent.selectAll("#outdoorCircle").data(dataset);
+                var graphLines = svgCurrent.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5));
+                
+                
+                // remove unnecessary objects and add now needed ones
+                indoorCircles.exit().remove();
+                indoorCircles.enter().append("circle").attr("r", 0);
+
+                outdoorCircles.exit().remove();
+                outdoorCircles.enter().append("circle").attr("r", 0);
+                
+                graphLines.exit().remove();
+                graphLines.enter().append("line").moveToBack();
+                
+                // transition text/bars to their new values
+                graphLines.transition()
+                    .duration(750)
+                    .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "rgba(255,255,255,0.5)",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
+                
+                indoorCircles.transition()
+                    .duration(750)
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ 
+                            return height - scaleHeight(d.indoor) - heightPadding;
+                        },
+                        "r": 8,
+                        "id": "indoorCircle",
+                        "class": "indoor"
+                    });
+                
+                outdoorCircles.transition()
+                    .duration(750)
+                    .attr({
+                        "cx": function(d,i){return getXLoc(d,i);},
+                        "cy": function(d){ 
+                            return height - scaleHeight(d.outdoor) - heightPadding;
+                        },
+                        "r": 8,
+                        "id": "outdoorCircle",
+                        "class": "outdoor"
+                    });
+                
+                svgCurrent.selectAll(".indoorPath").transition()
+                    .duration(750)
+                    .attr("d", valueInd(dataset));
+                
+                svgCurrent.selectAll(".outdoorPath").transition()
+                    .duration(750)
+                    .attr("d", valueOut(dataset));
+                
+                svgCurrent.selectAll(".x.axis")                    
+                   .transition()
+                    .duration(750)
+                    .call(xAxis)
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
+                svgCurrent.selectAll(".y.axis") // change the y axis
+                    .transition()
+                    .duration(750)
+                    .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
+                    .call(yAxis);
+                
+                svgCurrent.select(".yLabel").attr("y", widthPadding + widthPadding/8)
+                    .attr("x", -(height-heightPadding-5)).moveToFront();
+                
+            }
+            
+            /*
+                This method updates the "Historical Water Use" graph with new data
+            */
+            function updateAggGraph(dataset,type){
+                var lastDate = getAdjustedDate(dataset[0].timestamp, type, true); 
+                //console.log(lastDate);
+                var firstDate = getAdjustedDate(dataset[dataset.length-1].timestamp, type, false);
+                //console.log(firstDate);
+                
+                barPadding = width/(dataset.length*4);
+                
+                var scaleTime = d3.time.scale()
+                    .domain([firstDate, lastDate])
+                    .range([widthPadding, width-widthPadding/2]);
+                
+                var scaleHeight = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
+                    .range([0, height-heightPadding*2]);
+
+                var scaleHeightUpsideDown = d3.scale.linear()
+                    .domain([0, d3.max(dataset, function(d){ return (d.outdoor+d.indoor);})])
+                    .range([height-heightPadding*2, 0]);
+                
+                var yAxis = d3.svg.axis()
+                    .scale(scaleHeightUpsideDown)
+                    .orient("left")
+                    .ticks(5);
+                
+                var xAxis = d3.svg.axis()
+                    .scale(scaleTime)
+                    .orient("bottom")
+                    .ticks(dataset.length + 1);
+                
+                var svgAgg = d3.select("#aggregate svg");
+                
+            
+                // associate the bars, indoor rectangles and outdoor rectangles with the
+                // new dataset
+                var indoorRects = svgAgg.selectAll("#indoorRect")
+                    .data(dataset);
+                var outdoorRects = svgAgg.selectAll("#outdoorRect")
+                    .data(dataset);
+                var barText = svgAgg.selectAll(".barText")
+                    .data(dataset);
+                var graphLines = svgAgg.selectAll("line.horizontalGrid")
+                    .data(scaleHeightUpsideDown.ticks(5));
+                
+                // remove unnecessary objects and add now needed ones
+                indoorRects.exit().remove();
+                indoorRects.enter().append("rect").attr({"width": 0, "height":0});
+
+                outdoorRects.exit().remove();
+                outdoorRects.enter().append("rect").attr({"width": 0, "height":0});
+                
+                barText.exit().remove();
+                barText.enter().append("text").text("0");
+                
+                graphLines.exit().remove();
+                graphLines.enter().append("line").moveToBack();
+                
+                // transition text/bars to their new values
+                graphLines.transition()
+                    .duration(750)
+                    .attr(
+                        {
+                            "class":"horizontalGrid",
+                            "x1" : widthPadding,
+                            "x2" : width - widthPadding/2,
+                            "y1" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "y2" : function(d){ return scaleHeightUpsideDown(d) + heightPadding;},
+                            "fill" : "none",
+                            "shape-rendering" : "crispEdges",
+                            "stroke" : "rgba(255,255,255,0.5)",
+                            "stroke-width" : "1px",
+                            "stroke-dasharray" : "5, 5"
+                        });
+                
+                barText.transition()
+                    .duration(750)
+                    .text(function(d){
+                        return (d.indoor + d.outdoor).toFixed(2);
+                    })
+                    .attr("x", function(d){
+                        var date = getAdjustedDate(d.timestamp, type, false);
+                        return scaleTime(date) + ((width-widthPadding/2)/dataset.length - barPadding)/2;
+                    })
+                    .attr("y", function(d){
+                        return height - scaleHeight(d.indoor) - scaleHeight(d.outdoor) - heightPadding*4/3;
+                    })
+                    .attr("class", "barText")
+                    .attr("text-anchor", "middle");
+                
+                // update existing ones
+                indoorRects.transition()
+                    .duration(750)
+                    .attr({
+                        "x": function(d,i){
+                            date = getAdjustedDate(d.timestamp, type, false);
+                            return scaleTime(date);
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.indoor);
+                        },
+                        "id": "indoorRect",
+                        "class": "indoor"
+                    });
+                
+                outdoorRects.transition()
+                    .duration(750)
+                    .attr({
+                        "x": function(d,i){
+                            var date = getAdjustedDate(d.timestamp, type, false);
+                            return scaleTime(date);
+                        },
+                        "y": function (d){
+                            return height - scaleHeight(d.outdoor) - scaleHeight(d.indoor) - heightPadding;   
+                        },
+                        "width": (width-widthPadding/2)/dataset.length - barPadding,
+                        "height": function(d){
+                            return scaleHeight(d.outdoor);
+                        },
+                        "id": "outdoorRect",
+                        "class": "outdoor"
+                    });
+                
+                
+                // update the x and y axis
+                svgAgg.selectAll(".x.axis")                    
+                   .transition()
+                    .duration(750)
+                    .call(xAxis)
+                    .attr("transform", "translate(" + 0 + "," + (height-heightPadding) + ")");
+                svgAgg.selectAll(".y.axis") // change the y axis
+                    .transition()
+                    .duration(750)
+                    .attr("transform", "translate("+ widthPadding + "," + heightPadding + ")")
+                    .call(yAxis);
+                
+                // move the gallons label to the front of the data
+                svgAgg.select(".yLabel").attr("y", widthPadding + widthPadding/8)
+                    .attr("x", -(height-heightPadding-5)).moveToFront();
+                
+            
+                
+                
+            }
+            
+            /*
+                This method updates the pie graph with new data
+            */
+            function updatePieGraph(dataset) {
+                
+                
+                var chartWidth = $("#piechart").width();
+                var chartHeight = $("#piechart").height();
+                var radius = Math.min(chartWidth/2, chartHeight/2.2);
+                
+                var svgPie = d3.select("#piechart svg");
+                
+                svgPie
+                    .transition()
+                    .duration(750)
+                    .attr("width", chartWidth)
+                    .attr("height", chartHeight); 
+                
+                svgPie.selectAll(".transform")
+                    .transition()
+                    .duration(750)
+                    .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight/2 + ")");
+                
+                var arc = d3.svg.arc()
+				.outerRadius(radius)
+				.innerRadius(radius/3);
+
+                var pie = d3.layout.pie()
+                        .sort(null)
+                        .value(function(d){ return d.value; });
+
+                var g = svgPie.selectAll(".fan")
+                        .data(pie(dataset));
+                
+                g.enter().append("g").attr("class", "fan");
+
+                g.selectAll("path")
+                    .attr("d", arc)
+                    .attr("fill", function(d){ 
+                    return colors[d.data.name]; });
+                
+                var keyWidth = $("#chartKey").width();
+                var keyHeight = $("#chartKey").height();
+                var keyRadius = Math.min(keyHeight,keyWidth/5)/7;
+                
+                svgKey = d3.select("#chartKey svg");
+                
+                svgKey.select(".indoor")
+                    .transition()
+                    .duration(750)
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(2.4/8),
+                        "cy": keyHeight/2,
+                    });
+                
+                svgKey.selectAll(".pieLabel")
+                    .transition()
+                    .duration(750)
+                    .attr({
+                        "x": function() {
+                            if (this.id == "indoorLabel"){
+                                return keyWidth*(2.4/8) + keyRadius*2;
+                            } else {
+                                return keyWidth*(4.4/8) + keyRadius*2;
+                            }
+                            
+                        },
+                        "y": keyHeight/2 + keyRadius/2,
+                    });
+                
+                svgKey.select(".outdoor")
+                    .transition()
+                    .duration(750)
+                    .attr({
+                        "r": keyRadius,
+                        "cx": keyWidth*(4.4/8),
+                        "cy": keyHeight/2,
+                    });
+                
+            }
+            
+            /*
+                This method updates the stat sheet with new data
+            */
+            function updateStatSheet(dataset){
+                
+                var order = ['average', 'min', 'max'];
+                
+                var sheetWidth = $("#statSheet").width();
+                var sheetHeight = $("#statSheet").height();
+                
+                var svgSheet = d3.select("#statSheet svg")
+                    .attr("width", sheetWidth)
+                    .attr("height", sheetHeight);
+                
+                svgSheet.selectAll(".statText")
+                    .transition()
+                    .duration(750)
+                    .text(function(d,i){
+                        return currentAggType + " " + order[i] + ": ";
+                    })
+                    .attr("x", sheetWidth/2-2)
+                    .attr("y", function(d,i){
+                        return 1.5*(i+1)+"em";
+                    });
+                
+                svgSheet.selectAll(".statTextLight")
+                    .transition()
+                    .duration(750)
+                    .text(function(d,i){
+                        return parseFloat(dataset[order[i]]).toFixed(2) + " gal";
+                    })
+                    .attr("x", sheetWidth/2+2)
+                    .attr("y", function(d,i){
+                        return 1.5*(i+1)+"em";
+                    });
+            }
+            
+            /*
+                This function is used to add a y label to the current and historical use graphs
+                The label is turned 90 degrees and is located just inside the graph
+            */
+            function addYLabel(svg){
+                svg.append("text")
+                    .attr("class", "yLabel")
+                    .attr("text-anchor", "start")
+                    .attr("y", widthPadding + widthPadding/8)
+                    .attr("x", -(height-heightPadding-5))
+                    .attr("dy", ".75em")
+                    .attr("transform", "rotate(-90)")
+                    .text("Gallons");
+            }
+            
+            /*
+                This function is used to adjust the timestamps received from the server according
+                to the type of aggregation.
+            */
+            function getAdjustedDate(timestamp, type, last){
+                    
+                var arr = timestamp.split(/[- :]/)
+                var date;
+                    
+                if (type == 'daily') {
+                    date = new Date(arr[0], arr[1]-1, arr[2]);
+                    if (last) date.setDate(date.getDate() + 1);
+                }
+                    
+                if (type == 'hourly' || type == 'current'){
+                    date = new Date(arr[0], arr[1]-1, arr[2], arr[3], arr[4], arr[5]);
+                    if (last) date.setHours(date.getHours() + 1);
+                }
+                
+                if (type == 'monthly'){
+                    date = new Date(arr[0], arr[1]-1, arr[2]);
+                    if (last) date.setMonth(date.getMonth() + 1);
+                } 
+                    
+                
+                return date;
+            }
+            
+            // This function is at the suggestion of user Sundar on bl.ocks.org
+            // link: http://bl.ocks.org/eesur/4e0a69d57d3bfc8a82c2
+            d3.selection.prototype.moveToBack = function() {  
+                return this.each(function() { 
+                    var firstChild = this.parentNode.firstChild; 
+                    if (firstChild) { 
+                        this.parentNode.insertBefore(this, firstChild); 
+                    } 
+                });
+            };
+            
+            // https://github.com/wbkd/d3-extended
+            d3.selection.prototype.moveToFront = function() {  
+              return this.each(function(){
+                this.parentNode.appendChild(this);
+              });
+            };
+            
+            // This is used by the Date Time calculator so that the name of the month can be displayed
+            var monthArray = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            
+        </script>
+    </body>
+</html>

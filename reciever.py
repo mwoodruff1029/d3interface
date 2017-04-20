@@ -8,7 +8,6 @@ import datetime
 import threading
 import psycopg2
 
-#from datetime import datetime
 from flask import Flask, jsonify, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Date, cast
@@ -24,11 +23,12 @@ def launchServer():
 
     conn, addr = s.accept()
 
+    # accept messages over tcp
     while True:
         data = conn.recv(BUFFER_SIZE)
         if not data: break
-        #print data
-        # add data to our database
+
+        # add data to our database using the Water_usage class we've defined
         data = json.loads(data)
         entry = Water_usage(data['readingOut'], data['readingIn'], data['timestamp'])
         db.session.add(entry)
@@ -65,15 +65,18 @@ class Water_usage(db.Model):
                 'timestamp' : str(self.ts)
             }
 
+# render the html of the homepage
 @app.route("/")
-def hello():
-    return render_template('index2.html')
+def home():
+    return render_template('index.html')
 
 # this returns all readings available
 @app.route("/sha/v1.0/readings/", methods=['GET'])
 def get_all_meter_readings():
     return jsonify(meters=[i.serialize for i in Water_usage.query.all()])
 
+# this returns readings aggregated on an hourly basis starting with the most recent
+# the max number returned is 10 by default but can be passed to this endpoint
 @app.route("/sha/v1.0/readings/hourly", methods=['GET'])
 def get_hourly_readings():
     # check to see if the user submitted a max number of requests
@@ -92,6 +95,8 @@ def get_hourly_readings():
 
     return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(datetime.datetime.combine(i[3], datetime.time(int(i[2]))))} for i in agg])
 
+# this returns readings aggregated on an monthly basis starting with the most recent
+# the max number returned is 10 by default but can be passed to this endpoint
 @app.route("/sha/v1.0/readings/monthly", methods=['GET'])
 def get_monthly_readings():
     # check to see if the user submitted a max number of requests
@@ -110,6 +115,8 @@ def get_monthly_readings():
 
     return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(datetime.date(int(i[3]), int(i[2]), 1))} for i in agg])
 
+# this returns readings aggregated on an daily basis starting with the most recent
+# the max number returned is 10 by default but can be passed to this endpoint
 @app.route("/sha/v1.0/readings/daily", methods=['GET'])
 def get_daily_readings():
 
@@ -126,6 +133,7 @@ def get_daily_readings():
         cast(Water_usage.ts,Date)).group_by(cast(Water_usage.ts, Date)).order_by(cast(Water_usage.ts,Date).desc()).limit(max)
     return jsonify(meters=[{'outdoor': float(str(i[0])), 'indoor': float(str(i[1])), 'timestamp': str(i[2])} for i in agg])
 
+# this returns the sum of the total outdoor and indoor water used
 @app.route("/sha/v1.0/readings/sum", methods=['GET'])
 def get_sum_readings():
 
@@ -135,6 +143,7 @@ def get_sum_readings():
     )
     return jsonify(meters=[{'name': 'outdoor', 'value':float(str(sum[0][0]))}, {'name': 'indoor', 'value': float(str(sum[0][1]))}])
 
+# this returns basic stats for water use (min, max, average)
 @app.route("/sha/v1.0/readings/stats", methods=['GET'])
 def get_reading_stats():
     data = request.args
@@ -174,7 +183,7 @@ def get_reading_stats():
     else: 
         return "error"
 
-# this returns the most current readings, up to a max submitted by the requester
+# this returns the most recent readings, up to a max submitted by the requester
 # the default max is 10
 @app.route("/sha/v1.0/readings/current/", methods=['GET'])
 def get_current_meter_readings():
@@ -186,7 +195,7 @@ def get_current_meter_readings():
     #print result
     return jsonify(meters=[i.serialize for i in result])
 
-# this returns the readings that have occurred since the timestamp that is passed
+# this returns the readings that have occurred since the timestamp that is passed to the method
 @app.route("/sha/v1.0/readings/<string:timestamp>", methods=['GET'])
 def get_meter_readings(timestamp):
     last_reading = datetime.datetime.strptime(timestamp, '%Y-%m-%d').date()
@@ -194,11 +203,13 @@ def get_meter_readings(timestamp):
     return jsonify(readings=[i.serialize for i in result])
     
 if __name__ == "__main__":
+    # create a separate thread for the tcp accepting launchServer
     t = threading.Thread(target=launchServer)
     t.daemon = True
     t.start()
     # run flask server on local ip address so it can be accessed
-    # by other devices on the network that know its IP address
+    # by other devices on that know its IP address
+    # run on port 80 as per http protocol
     app.run(host='0.0.0.0', port='80', threaded=True)
 
 
